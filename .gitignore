@@ -1,0 +1,67 @@
+# =========================
+# Python / Virtual Env
+# =========================
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# Data files (VERY IMPORTANT)
+# =========================
+data/raw/
+data/out/
+
+# Ignore large data formats explicitly (extra safety)
+*.csv
+*.tsv
+*.txt
+*.zip
+*.ndjson
+*.json
+
+# =========================
+# Databases
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Logs / temp
+# =========================
+*.log
+*.tmp
+*.temp
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Misc
+# =========================
+.cache/
+.pytest_cache/
+.mypy_cache/
