@@ -18,3 +18,6 @@ fråga peder efter mail som vi skickar ut och koppla det så man skickar mail
 
 dubbelkolla så det är b2b bara så inte didup får skit
 klar ? 
+
+SNI filtering , kan filktrera på arkitetker typ ?? värt eller inte ? perosnligare mail 
+
