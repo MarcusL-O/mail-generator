@@ -10,13 +10,12 @@ IN_PATH = Path("data/out/goteborg_companies_filtered.ndjson")
 HITS_PATH = Path("data/out/gbg_sites_hits.ndjson")
 MISSES_PATH = Path("data/out/gbg_sites_misses.ndjson")
 
-BATCH_SIZE = 500
+BATCH_SIZE = 1000
 
-TIMEOUT_SECONDS = 7
-SLEEP_BETWEEN_REQUESTS = 0.12
+TIMEOUT_SECONDS = 5
+SLEEP_BETWEEN_REQUESTS = 0.05
 
-TLDS = ["se", "com", "nu", "net", "eu"]
-
+TLDS = ["se", "com"]
 
 PARKED_KEYWORDS = [
     "domain for sale",
@@ -34,6 +33,9 @@ PARKED_KEYWORDS = [
     "domain is for sale",
 ]
 
+session = requests.Session()
+session.headers.update({"User-Agent": "Mozilla/5.0 (Didup-Site-Guesser/1.0)"})
+
 
 def _normalize_swedish(s: str) -> str:
     return (
@@ -47,7 +49,6 @@ def _normalize_swedish(s: str) -> str:
 def clean_company_name(name: str) -> str:
     s = name.lower().strip()
 
-    # ta bort vanliga juridiska suffix som ofta sabbar domängissning
     suffixes = [
         " aktiebolag", " ab",
         " handelsbolag", " hb",
@@ -62,20 +63,17 @@ def clean_company_name(name: str) -> str:
     s = s.replace("&", " och ")
     s = _normalize_swedish(s)
 
-    # behåll bara a-z 0-9 och mellanslag (för hyphen-slug)
     s = re.sub(r"[^a-z0-9 ]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
 
 def slug_compact(clean_name: str) -> str:
-    # "exempel foretag" -> "exempelforetag"
     s = clean_name.replace(" ", "")
     return s if len(s) >= 4 else ""
 
 
 def slug_hyphen(clean_name: str) -> str:
-    # "exempel foretag" -> "exempel-foretag"
     s = clean_name.replace(" ", "-")
     s = re.sub(r"-+", "-", s).strip("-")
     return s if len(s) >= 4 else ""
@@ -90,7 +88,6 @@ def domain_candidates(slugs: list[str]) -> list[str]:
             domains.append(f"{slug}.{tld}")
             domains.append(f"www.{slug}.{tld}")
 
-    # dedupe (behåll ordning)
     seen = set()
     uniq = []
     for d in domains:
@@ -120,34 +117,31 @@ def fetch_probe(url: str) -> tuple[bool, bool]:
     parked=True om den ser ut som parkerad/sälj-domän
     """
     try:
-        r = requests.head(url, timeout=TIMEOUT_SECONDS, allow_redirects=True)
-        if not (200 <= r.status_code < 400):
-            r = requests.get(
-                url,
-                timeout=TIMEOUT_SECONDS,
-                allow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
+        r = session.get(
+            url,
+            timeout=(3, TIMEOUT_SECONDS),
+            allow_redirects=True,
+            stream=True,
+        )
 
         if not (200 <= r.status_code < 400):
+            r.close()
             return (False, False)
 
         if not looks_like_html(r.headers):
+            r.close()
             return (True, False)
 
-        # Läs lite HTML (upp till 20k chars) för parked-detektion
-        if r.request.method.upper() == "HEAD":
-            rg = requests.get(
-                r.url,
-                timeout=TIMEOUT_SECONDS,
-                allow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            snippet = (rg.text or "")[:20000].lower()
-        else:
-            snippet = (r.text or "")[:20000].lower()
+        chunk = r.raw.read(20_000, decode_content=True)
+        r.close()
 
-        if is_parked_html(snippet):
+        snippet = ""
+        try:
+            snippet = (chunk.decode("utf-8", errors="ignore") or "").lower()
+        except Exception:
+            snippet = ""
+
+        if snippet and is_parked_html(snippet):
             return (True, True)
 
         return (True, False)
@@ -190,7 +184,6 @@ def main():
     misses = 0
     parked_skips = 0
 
-    # append-läge så vi kan köra flera batchar utan att förlora data
     with IN_PATH.open("r", encoding="utf-8") as fin, \
          HITS_PATH.open("a", encoding="utf-8") as fh, \
          MISSES_PATH.open("a", encoding="utf-8") as fm:
@@ -239,7 +232,7 @@ def main():
 
             if website:
                 hits += 1
-                out = {"orgnr": orgnr, "name": name, "website": website, "source": "guess"}
+                out = {"orgnr": orgnr, "name": name, "website": website}
                 fh.write(json.dumps(out, ensure_ascii=False) + "\n")
             else:
                 misses += 1
