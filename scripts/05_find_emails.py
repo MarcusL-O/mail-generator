@@ -1,54 +1,52 @@
-import json
 import re
 import time
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
+DB_PATH = Path("data/mail_generator_db.sqlite")
 
-IN_PATH = Path("data/out/gbg_sites_hits.ndjson")
-HITS_PATH = Path("data/out/email_hits.ndjson")
-MISSES_PATH = Path("data/out/email_misses.ndjson")
+BATCH_SIZE = 500
 
-MAX_EMAILS_PER_COMPANY = 3
+MAX_EMAILS_PER_COMPANY = 3  # ändra till 5 om du vill
 
 # Nätverk
 TIMEOUT_SEC = 7
 RETRY_COUNT = 1
 SLEEP_BETWEEN_REQUESTS_SEC = 0.10
 
-# Speed: läs bara första N bytes (räcker ofta för header/footer + kontaktinfo)
-MAX_READ_BYTES = 80_000  # 80KB
+# Speed: läs bara första N bytes
+MAX_READ_BYTES = 80_000
 
 USER_AGENT = "Mozilla/5.0 (compatible; Didup-Mail-Finder/1.1)"
 
-LIMIT = 10
+# TTL/refresh
+REFRESH_DAYS = 180
 
 # Kontakt-sidor att leta efter (sv + eng)
 CONTACT_KEYWORDS = [
     "kontakt", "kontakta", "kontakt oss",
     "contact", "contact us",
     "support", "help", "kundservice",
-    "om oss", "about", "about us"
+    "om oss", "about", "about us",
 ]
 
-# Vanliga URL-paths (om sidan inte har tydliga länkar)
 CONTACT_PATH_HINTS = [
     "/kontakt", "/kontakta-oss", "/kontakt-oss",
     "/contact", "/contact-us",
     "/support", "/help",
-    "/om-oss", "/about", "/about-us"
+    "/om-oss", "/about", "/about-us",
 ]
 
-# Oönskade mail (skräp)
 BLOCKLIST_PREFIXES = {"noreply", "no-reply", "donotreply", "do-not-reply", "example", "test"}
 BLOCKLIST_CONTAINS = {"@example.", "@test.", "@email.com"}
 
-# Strict email regex (vanliga mail på sidor)
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
-
 
 session = requests.Session()
 session.headers.update({
@@ -58,9 +56,32 @@ session.headers.update({
 })
 
 
-# -------------------------
-# HELPERS
-# -------------------------
+def utcnow_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def parse_iso(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def needs_email_refresh(emails: Optional[str], checked_at: Optional[str]) -> bool:
+    # saknar emails -> ja
+    if not emails or not str(emails).strip():
+        return True
+
+    dt = parse_iso(checked_at)
+    if not dt:
+        return True
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=REFRESH_DAYS)
+    return dt < cutoff
+
+
 def normalize_url(url: str) -> str:
     url = (url or "").strip()
     if not url:
@@ -79,11 +100,7 @@ def same_domain(a: str, b: str) -> bool:
         return False
 
 
-def fetch_html_snippet(url: str) -> str | None:
-    """
-    Snabb fetch: GET stream=True, läs bara första MAX_READ_BYTES.
-    Returnerar en (oftast tillräcklig) HTML-snutt för email-detektion.
-    """
+def fetch_html_snippet(url: str) -> Optional[str]:
     url = normalize_url(url)
     if not url:
         return None
@@ -103,8 +120,7 @@ def fetch_html_snippet(url: str) -> str | None:
                         break
 
                 encoding = r.encoding or "utf-8"
-                text = bytes(buf).decode(encoding, errors="ignore")
-                return text
+                return bytes(buf).decode(encoding, errors="ignore")
 
         except Exception:
             time.sleep(0.35 + attempt * 0.35)
@@ -130,6 +146,11 @@ def extract_emails_from_text(text: str) -> list[str]:
         if prefix in BLOCKLIST_PREFIXES:
             continue
         if any(x in em for x in BLOCKLIST_CONTAINS):
+            continue
+
+        BAD_TLDS = (".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif", ".css", ".js")
+
+        if em.endswith(BAD_TLDS):
             continue
 
         if em not in seen:
@@ -158,7 +179,7 @@ def extract_emails_from_html(html: str) -> list[str]:
     # 2) regex i HTML/text
     emails.extend(extract_emails_from_text(html))
 
-    # dedupe
+    # dedupe preserving order
     out: list[str] = []
     seen: set[str] = set()
     for e in emails:
@@ -187,7 +208,14 @@ def prioritize_emails(emails: list[str]) -> list[str]:
 def cap_emails(emails: list[str], max_n: int) -> list[str]:
     if not emails:
         return []
-    return prioritize_emails(emails)[:max_n]
+    # unique first
+    seen = set()
+    uniq = []
+    for e in emails:
+        if e not in seen:
+            uniq.append(e)
+            seen.add(e)
+    return prioritize_emails(uniq)[:max_n]
 
 
 def find_contact_links(base_url: str, html: str) -> list[str]:
@@ -211,7 +239,6 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
             if same_domain(base_url, full):
                 candidates.append(full)
 
-    # fallback: vanliga paths
     for path in CONTACT_PATH_HINTS:
         candidates.append(urljoin(base_url, path))
 
@@ -226,70 +253,88 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
     return out[:3]
 
 
-def pick_fields(obj: dict) -> tuple[str, str, str]:
-    orgnr = str(obj.get("orgnr") or obj.get("orgNr") or obj.get("organizationNumber") or "").strip()
-    name = str(obj.get("name") or obj.get("company_name") or obj.get("bolagsnamn") or "").strip()
-    website = str(obj.get("website") or obj.get("site") or obj.get("url") or "").strip()
-    return orgnr, name, website
+def pick_targets(conn: sqlite3.Connection, limit: int) -> list[tuple[str, str, str, Optional[str], Optional[str]]]:
+    """
+    Return (orgnr, name, website, emails, emails_checked_at)
+    Hämtar bara de med website och som behöver refresh.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT orgnr, name, website, emails, emails_checked_at
+        FROM companies
+        WHERE website IS NOT NULL AND TRIM(website) <> ''
+        ORDER BY emails_checked_at IS NOT NULL, emails_checked_at ASC
+        LIMIT ?
+        """,
+        (limit * 5,),
+    )
+    rows = cur.fetchall()
+
+    out = []
+    for orgnr, name, website, emails, checked_at in rows:
+        if not orgnr or not name or not website:
+            continue
+        if needs_email_refresh(emails, checked_at):
+            out.append((orgnr, name, website, emails, checked_at))
+            if len(out) >= limit:
+                break
+    return out
 
 
-# -------------------------
-# MAIN
-# -------------------------
+def update_company_emails(conn: sqlite3.Connection, orgnr: str, emails_csv: Optional[str], status: str) -> None:
+    now = utcnow_iso()
+    emails_csv = (emails_csv or "").strip()
+
+    conn.execute(
+        """
+        UPDATE companies
+        SET emails = CASE
+                WHEN ? IS NOT NULL AND TRIM(?) <> '' THEN ?
+                ELSE emails
+            END,
+            email_status = ?,
+            emails_checked_at = ?,
+            updated_at = ?
+        WHERE orgnr = ?
+        """,
+        (emails_csv, emails_csv, emails_csv, status, now, now, orgnr),
+    )
+
+
 def main():
-    if not IN_PATH.exists():
-        raise SystemExit(f"Input not found: {IN_PATH}")
+    if not DB_PATH.exists():
+        raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
-    HITS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
 
-    # skriv om filer varje körning (MVP)
-    if HITS_PATH.exists():
-        HITS_PATH.unlink()
-    if MISSES_PATH.exists():
-        MISSES_PATH.unlink()
+    targets = pick_targets(conn, BATCH_SIZE)
+    print(f"Targets: {len(targets)} (batch={BATCH_SIZE})")
 
     processed = 0
     hits = 0
     misses = 0
+    fetch_fail = 0
 
-    with IN_PATH.open("r", encoding="utf-8") as f_in, \
-         HITS_PATH.open("w", encoding="utf-8") as f_hits, \
-         MISSES_PATH.open("w", encoding="utf-8") as f_miss:
-
-        for line in f_in:
-            if LIMIT is not None and processed >= LIMIT:
-                break
-
+    try:
+        for orgnr, name, website, _, _ in targets:
             processed += 1
-            obj = json.loads(line)
-
-            orgnr, name, website = pick_fields(obj)
             website = normalize_url(website)
-
-            if not website:
-                misses += 1
-                f_miss.write(json.dumps({
-                    "orgnr": orgnr,
-                    "name": name,
-                    "website": "",
-                    "emails": [],
-                    "reason": "no_website"
-                }, ensure_ascii=False) + "\n")
-                continue
 
             emails: list[str] = []
 
-            # 1) Startsida (snabb snippet-läsning)
+            # 1) startsida
             html_home = fetch_html_snippet(website)
             time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
 
             if html_home:
                 emails = extract_emails_from_html(html_home)
-                if emails:
-                    emails = cap_emails(emails, MAX_EMAILS_PER_COMPANY)
-                    
-                else:
-                    # 2) Kontakt-länkar
+                emails = cap_emails(emails, MAX_EMAILS_PER_COMPANY)
+
+                # 2) kontakt-länkar om inga emails på startsidan
+                if not emails:
                     contact_links = find_contact_links(website, html_home)
                     for link in contact_links:
                         html_contact = fetch_html_snippet(link)
@@ -298,35 +343,41 @@ def main():
                             continue
 
                         found = extract_emails_from_html(html_contact)
+                        found = cap_emails(found, MAX_EMAILS_PER_COMPANY)
                         if found:
-                            emails = cap_emails(found, MAX_EMAILS_PER_COMPANY)
-                            
+                            emails = found
                             break
+            else:
+                fetch_fail += 1
 
             if emails:
                 hits += 1
-                f_hits.write(json.dumps({
-                    "orgnr": orgnr,
-                    "name": name,
-                    "website": website,
-                    "emails": emails,
-                }, ensure_ascii=False) + "\n")
+                emails_csv = ",".join(emails)
+                update_company_emails(conn, orgnr, emails_csv, "found")
             else:
                 misses += 1
-                f_miss.write(json.dumps({
-                    "orgnr": orgnr,
-                    "name": name,
-                    "website": website,
-                    "emails": [],
-                    "reason": "no_email_found_or_fetch_failed"
-                }, ensure_ascii=False) + "\n")
+                # markera att vi försökte; skriv inte över emails med tomt
+                status = "fetch_failed" if not html_home else "not_found"
+                update_company_emails(conn, orgnr, None, status)
 
-            if processed % 50 == 0:
-                print(f"[{processed}] hits={hits} misses={misses}")
+            if processed % 100 == 0:
+                conn.commit()
+                print(f"[{processed}] committed | hits={hits} misses={misses} fetch_fail={fetch_fail}")
 
-    print(f"Done. processed={processed} hits={hits} misses={misses}")
-    print(f"Hits:   {HITS_PATH}")
-    print(f"Misses: {MISSES_PATH}")
+        conn.commit()
+
+    except KeyboardInterrupt:
+        conn.commit()
+        print("\nAvbruten (Ctrl+C) — commit gjord ✅")
+
+    finally:
+        conn.close()
+
+    print("KLART ✅")
+    print(f"Processade: {processed}")
+    print(f"HITS: {hits}")
+    print(f"MISSES: {misses}")
+    print(f"Fetch-fail: {fetch_fail}")
 
 
 if __name__ == "__main__":

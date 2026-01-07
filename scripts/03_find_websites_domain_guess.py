@@ -1,14 +1,13 @@
-import json
 import re
 import time
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 import requests
 
-IN_PATH = Path("data/out/goteborg_companies_filtered.ndjson")
-
-HITS_PATH = Path("data/out/gbg_sites_hits.ndjson")
-MISSES_PATH = Path("data/out/gbg_sites_misses.ndjson")
+DB_PATH = Path("data/mail_generator_db.sqlite")
 
 BATCH_SIZE = 1000
 
@@ -16,6 +15,9 @@ TIMEOUT_SECONDS = 5
 SLEEP_BETWEEN_REQUESTS = 0.05
 
 TLDS = ["se", "com"]
+
+# refresh: kör om website-check om äldre än X dagar
+REFRESH_DAYS = 90
 
 PARKED_KEYWORDS = [
     "domain for sale",
@@ -35,6 +37,32 @@ PARKED_KEYWORDS = [
 
 session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0 (Didup-Site-Guesser/1.0)"})
+
+
+def utcnow_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def parse_iso(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def needs_refresh(website: Optional[str], checked_at: Optional[str]) -> bool:
+    # saknar website -> ja
+    if not website or not str(website).strip():
+        return True
+
+    dt = parse_iso(checked_at)
+    if not dt:
+        return True
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=REFRESH_DAYS)
+    return dt < cutoff
 
 
 def _normalize_swedish(s: str) -> str:
@@ -150,68 +178,79 @@ def fetch_probe(url: str) -> tuple[bool, bool]:
         return (False, False)
 
 
-def load_done_orgnrs() -> set[str]:
-    done = set()
-
-    for path in (HITS_PATH, MISSES_PATH):
-        if not path.exists():
+def pick_targets(conn: sqlite3.Connection, limit: int) -> list[tuple[str, str, Optional[str], Optional[str]]]:
+    """
+    Return (orgnr, name, website, website_checked_at)
+    Vi hämtar *kandidater* och filtrerar TTL i Python (enkelt + robust).
+    """
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT orgnr, name, website, website_checked_at
+        FROM companies
+        ORDER BY website_checked_at IS NOT NULL, website_checked_at ASC
+        LIMIT ?
+        """,
+        (limit * 5,),  # plocka lite fler och filtrera
+    )
+    rows = cur.fetchall()
+    out = []
+    for orgnr, name, website, checked_at in rows:
+        if not orgnr or not name:
             continue
-        with path.open("r", encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                try:
-                    obj = json.loads(line)
-                    orgnr = (obj.get("orgnr") or "").strip()
-                    if orgnr:
-                        done.add(orgnr)
-                except Exception:
-                    continue
+        if needs_refresh(website, checked_at):
+            out.append((orgnr, name, website, checked_at))
+            if len(out) >= limit:
+                break
+    return out
 
-    return done
+
+def update_company_website(conn: sqlite3.Connection, orgnr: str, website: Optional[str], status: str) -> None:
+    now = utcnow_iso()
+    website = (website or "").strip()
+
+    conn.execute(
+        """
+        UPDATE companies
+        SET website = CASE
+                WHEN ? IS NOT NULL AND TRIM(?) <> '' THEN ?
+                ELSE website
+            END,
+            website_status = ?,
+            website_checked_at = ?,
+            updated_at = ?
+        WHERE orgnr = ?
+        """,
+        (website, website, website, status, now, now, orgnr),
+    )
 
 
 def main():
-    HITS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not DB_PATH.exists():
+        raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
-    done = load_done_orgnrs()
-    if done:
-        print(f"Resume: {len(done):,} bolag redan processade (hits+misses) -> skippar dem.")
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
 
-    scanned = 0
+    targets = pick_targets(conn, BATCH_SIZE)
+    print(f"Targets: {len(targets)} (batch={BATCH_SIZE})")
+
     processed = 0
     hits = 0
     misses = 0
     parked_skips = 0
 
-    with IN_PATH.open("r", encoding="utf-8") as fin, \
-         HITS_PATH.open("a", encoding="utf-8") as fh, \
-         MISSES_PATH.open("a", encoding="utf-8") as fm:
-
-        for line in fin:
-            if not line.strip():
-                continue
-
-            scanned += 1
-            if processed >= BATCH_SIZE:
-                break
-
-            obj = json.loads(line)
-            orgnr = (obj.get("orgnr") or "").strip()
-            name = (obj.get("name") or "").strip()
-            if not orgnr or not name:
-                continue
-
-            if orgnr in done:
-                continue
-
+    try:
+        for orgnr, name, _, _ in targets:
             processed += 1
 
             cleaned = clean_company_name(name)
             slugs = [slug_compact(cleaned), slug_hyphen(cleaned)]
             domains = domain_candidates(slugs)
 
-            website = None
+            found_url = None
+            status = "not_found"
 
             for domain in domains:
                 for url in url_variants(domain):
@@ -220,35 +259,45 @@ def main():
 
                     if not ok:
                         continue
+
                     if parked:
                         parked_skips += 1
+                        status = "parked"
                         continue
 
-                    website = url
+                    found_url = url
+                    status = "found"
                     break
 
-                if website:
+                if found_url:
                     break
 
-            if website:
+            if found_url:
                 hits += 1
-                out = {"orgnr": orgnr, "name": name, "website": website}
-                fh.write(json.dumps(out, ensure_ascii=False) + "\n")
+                update_company_website(conn, orgnr, found_url, "found")
             else:
                 misses += 1
-                out = {"orgnr": orgnr, "name": name, "website": None, "source": None}
-                fm.write(json.dumps(out, ensure_ascii=False) + "\n")
+                # Sätt status + checked_at, men skriv inte över website-fältet med tomt
+                update_company_website(conn, orgnr, None, status)
 
-            done.add(orgnr)
+            if processed % 200 == 0:
+                conn.commit()
+                print(f"[{processed}] committed | hits={hits} misses={misses} parked={parked_skips}")
+
+        conn.commit()
+
+    except KeyboardInterrupt:
+        conn.commit()
+        print("\nAvbruten (Ctrl+C) — commit gjord ✅")
+
+    finally:
+        conn.close()
 
     print("KLART ✅")
-    print(f"Scannat (tills batchen fylldes): {scanned:,}")
-    print(f"Processade i denna körning (batch): {processed:,}")
-    print(f"HITS: {hits:,}")
-    print(f"MISSES: {misses:,}")
-    print(f"Parked-skips: {parked_skips:,}")
-    print(f"Output HITS: {HITS_PATH}")
-    print(f"Output MISSES: {MISSES_PATH}")
+    print(f"Processade: {processed}")
+    print(f"HITS: {hits}")
+    print(f"MISSES: {misses}")
+    print(f"Parked-skips: {parked_skips}")
 
 
 if __name__ == "__main__":
