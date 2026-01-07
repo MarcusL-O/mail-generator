@@ -278,7 +278,6 @@ def main():
                 continue
 
             emails: list[str] = []
-            source: str | None = None
 
             # 1) Startsida (snabb snippet-läsning)
             html_home = fetch_html_snippet(website)
@@ -288,7 +287,7 @@ def main():
                 emails = extract_emails_from_html(html_home)
                 if emails:
                     emails = cap_emails(emails, MAX_EMAILS_PER_COMPANY)
-                    source = "home"
+                    
                 else:
                     # 2) Kontakt-länkar
                     contact_links = find_contact_links(website, html_home)
@@ -301,7 +300,7 @@ def main():
                         found = extract_emails_from_html(html_contact)
                         if found:
                             emails = cap_emails(found, MAX_EMAILS_PER_COMPANY)
-                            source = f"contact:{link}"
+                            
                             break
 
             if emails:
@@ -311,7 +310,6 @@ def main():
                     "name": name,
                     "website": website,
                     "emails": emails,
-                    "source": source,
                 }, ensure_ascii=False) + "\n")
             else:
                 misses += 1
