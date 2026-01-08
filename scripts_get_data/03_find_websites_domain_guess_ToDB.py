@@ -9,7 +9,7 @@ import requests
 
 DB_PATH = Path("data/mail_generator_db.sqlite")
 
-BATCH_SIZE = 1000
+BATCH_SIZE = None
 
 TIMEOUT_SECONDS = 5
 SLEEP_BETWEEN_REQUESTS = 0.05
