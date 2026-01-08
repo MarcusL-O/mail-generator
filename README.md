@@ -81,3 +81,6 @@ Mailer-scriptet läser CSV/Excel med email, company, subject, body
 Skickar via SMTP, SendGrid eller Microsoft Graph
 Loggar sent_at, status, bounce och svar
 Detta script är helt frikopplat från datainsamlingen
+
+ett script som går igneom db och kollar dem som inte vi hiitade sni på kollar bar apå dem och letar igen
+ett script som lägger in started at på dem i göteborg det har jag inte värderna på 
