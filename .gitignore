@@ -66,3 +66,6 @@ desktop.ini
 .cache/
 .pytest_cache/
 .mypy_cache/
+
+
+script_SNI_get_api.py
