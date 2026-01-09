@@ -20,7 +20,7 @@ BATCH_LIMIT = None         # None = ingen limit, annars t.ex. 10
 PRINT_EVERY = 10000         
 # =========================
 
-DB_PATH = os.getenv("DB_PATH", "data/mail_generator_db.sqlite")
+DB_PATH = os.getenv("DB_PATH", "data/companies.db.sqlite")
 TABLE = os.getenv("DB_TABLE", "companies")
 
 COL_ORGNR = os.getenv("DB_COL_ORGNR", "orgnr")

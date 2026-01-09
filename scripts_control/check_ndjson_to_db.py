@@ -2,7 +2,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 
-DB_PATH = Path("data/mail_generator_db.sqlite")
+DB_PATH = Path("data/companies.db.sqlite")
 TABLE = "companies"
 
 def _parse_sqlite_dt(s: str):

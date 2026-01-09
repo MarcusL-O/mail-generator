@@ -5,7 +5,7 @@ from pathlib import Path
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/mail_generator_db.sqlite")
+DB_PATH = Path("data/companies.db.sqlite")
 
 WEBSITES_NDJSON = Path("data/out/websites_guess.ndjson")
 EMAILS_NDJSON = Path("data/out/emails_found.ndjson")

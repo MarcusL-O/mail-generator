@@ -11,7 +11,7 @@ import requests
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/mail_generator_db.sqlite")
+DB_PATH = Path("data/companies.db.sqlite")
 OUT_PATH = Path("data/out/websites_guess.ndjson")  # <-- outputfil
 LIMIT = 0  # <-- antal att processa (0 = ALLA)
 RESUME = True  # <-- hoppa över orgnr som redan finns i OUT_PATH

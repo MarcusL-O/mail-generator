@@ -7,7 +7,7 @@ from typing import Optional
 
 import requests
 
-DB_PATH = Path("data/mail_generator_db.sqlite")
+DB_PATH = Path("data/companies.db.sqlite")
 
 BATCH_SIZE = None
 

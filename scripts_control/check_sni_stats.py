@@ -1,6 +1,6 @@
 import sqlite3
 
-DB_PATH = "data/mail_generator_db.sqlite"
+DB_PATH = "data/companies.db.sqlite"
 
 con = sqlite3.connect(DB_PATH)
 cur = con.cursor()

@@ -1,17 +1,36 @@
 import re
 import time
+import json
 import sqlite3
+import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urljoin, urlparse
+import argparse
+from urllib.parse import urljoin, urlparse, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
+from urllib3.exceptions import LocationParseError
+from requests.exceptions import InvalidURL
 
-DB_PATH = Path("data/mail_generator_db.sqlite")
+ap = argparse.ArgumentParser()
+ap.add_argument("--shard-id", type=int, required=True)
+ap.add_argument("--shard-total", type=int, default=4)
+args = ap.parse_args()
 
-BATCH_SIZE = 500
+SHARD_ID = args.shard_id
+SHARD_TOTAL = args.shard_total
+
+# =========================
+# ÄNDRA HÄR
+# =========================
+DB_PATH = Path("data/companies.db.sqlite")
+OUT_PATH = Path(f"data/out/emails_found_shard{SHARD_ID}.ndjson")  # <-- unik output per shard
+LIMIT = 0  # antal att processa (0 = ALLA)
+RESUME = True  # hoppa över orgnr som redan finns i OUT_PATH
+PRINT_EVERY = 100
+# =========================
 
 MAX_EMAILS_PER_COMPANY = 3  # ändra till 5 om du vill
 
@@ -70,7 +89,6 @@ def parse_iso(s: Optional[str]) -> Optional[datetime]:
 
 
 def needs_email_refresh(emails: Optional[str], checked_at: Optional[str]) -> bool:
-    # saknar emails -> ja
     if not emails or not str(emails).strip():
         return True
 
@@ -100,10 +118,59 @@ def same_domain(a: str, b: str) -> bool:
         return False
 
 
+# --- NYTT (minsta möjliga) ---
+def _valid_hostname(host: str) -> bool:
+    if not host:
+        return False
+
+    host = host.strip().lower().rstrip(".")
+    if len(host) > 253:
+        return False
+
+    if any(c.isspace() for c in host):
+        return False
+    if ".." in host:
+        return False
+
+    labels = host.split(".")
+    if len(labels) < 2:
+        return False
+
+    for lab in labels:
+        if not lab or len(lab) > 63:
+            return False
+        if lab.startswith("-") or lab.endswith("-"):
+            return False
+        if not re.fullmatch(r"[a-z0-9-]+", lab):
+            return False
+
+    return True
+
+
+def _safe_url(url: str) -> bool:
+    try:
+        u = (url or "").strip()
+        if not u:
+            return False
+        parts = urlsplit(u)
+        if parts.scheme not in ("http", "https"):
+            return False
+        host = parts.hostname or ""
+        return _valid_hostname(host)
+    except Exception:
+        return False
+# --- /NYTT ---
+
+
 def fetch_html_snippet(url: str) -> Optional[str]:
     url = normalize_url(url)
     if not url:
         return None
+
+    # --- NYTT (minsta möjliga) ---
+    if not _safe_url(url):
+        return None
+    # --- /NYTT ---
 
     for attempt in range(RETRY_COUNT + 1):
         try:
@@ -122,6 +189,10 @@ def fetch_html_snippet(url: str) -> Optional[str]:
                 encoding = r.encoding or "utf-8"
                 return bytes(buf).decode(encoding, errors="ignore")
 
+        # --- NYTT (minsta möjliga) ---
+        except (LocationParseError, InvalidURL):
+            return None
+        # --- /NYTT ---
         except Exception:
             time.sleep(0.35 + attempt * 0.35)
 
@@ -149,7 +220,6 @@ def extract_emails_from_text(text: str) -> list[str]:
             continue
 
         BAD_TLDS = (".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif", ".css", ".js")
-
         if em.endswith(BAD_TLDS):
             continue
 
@@ -208,7 +278,6 @@ def prioritize_emails(emails: list[str]) -> list[str]:
 def cap_emails(emails: list[str], max_n: int) -> list[str]:
     if not emails:
         return []
-    # unique first
     seen = set()
     uniq = []
     for e in emails:
@@ -242,7 +311,6 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
     for path in CONTACT_PATH_HINTS:
         candidates.append(urljoin(base_url, path))
 
-    # dedupe preserving order
     out: list[str] = []
     seen: set[str] = set()
     for u in candidates:
@@ -253,23 +321,35 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
     return out[:3]
 
 
-def pick_targets(conn: sqlite3.Connection, limit: int) -> list[tuple[str, str, str, Optional[str], Optional[str]]]:
+def pick_targets(conn: sqlite3.Connection, limit: Optional[int]) -> list[tuple[str, str, str, Optional[str], Optional[str]]]:
     """
     Return (orgnr, name, website, emails, emails_checked_at)
     Hämtar bara de med website och som behöver refresh.
     """
     cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT orgnr, name, website, emails, emails_checked_at
-        FROM companies
-        WHERE website IS NOT NULL AND TRIM(website) <> ''
-        ORDER BY emails_checked_at IS NOT NULL, emails_checked_at ASC
-        LIMIT ?
-        """,
-        (limit * 5,),
-    )
-    rows = cur.fetchall()
+
+    if limit is None:
+        cur.execute(
+            """
+            SELECT orgnr, name, website, emails, emails_checked_at
+            FROM companies
+            WHERE website IS NOT NULL AND TRIM(website) <> ''
+            ORDER BY emails_checked_at IS NOT NULL, emails_checked_at ASC
+            """
+        )
+        rows = cur.fetchall()
+    else:
+        cur.execute(
+            """
+            SELECT orgnr, name, website, emails, emails_checked_at
+            FROM companies
+            WHERE website IS NOT NULL AND TRIM(website) <> ''
+            ORDER BY emails_checked_at IS NOT NULL, emails_checked_at ASC
+            LIMIT ?
+            """,
+            (limit * 5,),
+        )
+        rows = cur.fetchall()
 
     out = []
     for orgnr, name, website, emails, checked_at in rows:
@@ -277,98 +357,123 @@ def pick_targets(conn: sqlite3.Connection, limit: int) -> list[tuple[str, str, s
             continue
         if needs_email_refresh(emails, checked_at):
             out.append((orgnr, name, website, emails, checked_at))
-            if len(out) >= limit:
+            if limit is not None and len(out) >= limit:
                 break
     return out
 
 
-def update_company_emails(conn: sqlite3.Connection, orgnr: str, emails_csv: Optional[str], status: str) -> None:
-    now = utcnow_iso()
-    emails_csv = (emails_csv or "").strip()
+def load_done_set(path: Path) -> set[str]:
+    done = set()
+    if not path.exists():
+        return done
+    with path.open("r", encoding="utf-8") as rf:
+        for line in rf:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                o = (obj.get("orgnr") or "").strip()
+                if o:
+                    done.add(o)
+            except Exception:
+                pass
+    return done
 
-    conn.execute(
-        """
-        UPDATE companies
-        SET emails = CASE
-                WHEN ? IS NOT NULL AND TRIM(?) <> '' THEN ?
-                ELSE emails
-            END,
-            email_status = ?,
-            emails_checked_at = ?,
-            updated_at = ?
-        WHERE orgnr = ?
-        """,
-        (emails_csv, emails_csv, emails_csv, status, now, now, orgnr),
-    )
+
+def in_shard(orgnr: str) -> bool:
+    h = hashlib.md5(orgnr.encode("utf-8")).hexdigest()
+    return (int(h, 16) % SHARD_TOTAL) == SHARD_ID
 
 
 def main():
     if not DB_PATH.exists():
         raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
-    conn = sqlite3.connect(DB_PATH)
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    done = load_done_set(OUT_PATH) if RESUME else set()
+    limit = None if LIMIT == 0 else LIMIT
+
+    # Read-only connect => inga DB-locks mot andra scripts
+    conn = sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True)
     conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
 
-    targets = pick_targets(conn, BATCH_SIZE)
-    print(f"Targets: {len(targets)} (batch={BATCH_SIZE})")
+    targets = pick_targets(conn, limit)
 
-    processed = 0
-    hits = 0
-    misses = 0
-    fetch_fail = 0
+    # shard-filter
+    targets = [(o, n, w, e, c) for (o, n, w, e, c) in targets if in_shard(o)]
+
+    # resume-filter
+    if RESUME and done:
+        targets = [(o, n, w, e, c) for (o, n, w, e, c) in targets if o not in done]
+
+    print(f"Targets: {len(targets)} (LIMIT={LIMIT}, RESUME={RESUME}, SHARD={SHARD_ID}/{SHARD_TOTAL})")
+
+    processed = hits = misses = fetch_fail = 0
+    start = time.time()
 
     try:
-        for orgnr, name, website, _, _ in targets:
-            processed += 1
-            website = normalize_url(website)
+        with OUT_PATH.open("a", encoding="utf-8") as out_f:
+            for orgnr, name, website, emails_before, checked_before in targets:
+                processed += 1
+                website = normalize_url(website)
 
-            emails: list[str] = []
+                found_emails: list[str] = []
+                status = "not_found"
 
-            # 1) startsida
-            html_home = fetch_html_snippet(website)
-            time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
+                # 1) startsida
+                html_home = fetch_html_snippet(website)
+                time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
 
-            if html_home:
-                emails = extract_emails_from_html(html_home)
-                emails = cap_emails(emails, MAX_EMAILS_PER_COMPANY)
+                if html_home:
+                    found_emails = extract_emails_from_html(html_home)
+                    found_emails = cap_emails(found_emails, MAX_EMAILS_PER_COMPANY)
 
-                # 2) kontakt-länkar om inga emails på startsidan
-                if not emails:
-                    contact_links = find_contact_links(website, html_home)
-                    for link in contact_links:
-                        html_contact = fetch_html_snippet(link)
-                        time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
-                        if not html_contact:
-                            continue
+                    # 2) kontakt-länkar om inga emails på startsidan
+                    if not found_emails:
+                        contact_links = find_contact_links(website, html_home)
+                        for link in contact_links:
+                            html_contact = fetch_html_snippet(link)
+                            time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
+                            if not html_contact:
+                                continue
 
-                        found = extract_emails_from_html(html_contact)
-                        found = cap_emails(found, MAX_EMAILS_PER_COMPANY)
-                        if found:
-                            emails = found
-                            break
-            else:
-                fetch_fail += 1
+                            cand = extract_emails_from_html(html_contact)
+                            cand = cap_emails(cand, MAX_EMAILS_PER_COMPANY)
+                            if cand:
+                                found_emails = cand
+                                break
+                else:
+                    fetch_fail += 1
+                    status = "fetch_failed"
 
-            if emails:
-                hits += 1
-                emails_csv = ",".join(emails)
-                update_company_emails(conn, orgnr, emails_csv, "found")
-            else:
-                misses += 1
-                # markera att vi försökte; skriv inte över emails med tomt
-                status = "fetch_failed" if not html_home else "not_found"
-                update_company_emails(conn, orgnr, None, status)
+                if found_emails:
+                    hits += 1
+                    status = "found"
+                else:
+                    misses += 1
+                    if status != "fetch_failed":
+                        status = "not_found"
 
-            if processed % 100 == 0:
-                conn.commit()
-                print(f"[{processed}] committed | hits={hits} misses={misses} fetch_fail={fetch_fail}")
+                row = {
+                    "orgnr": orgnr,
+                    "name": name,
+                    "website": website,
+                    "status": status,
+                    "emails": ",".join(found_emails),
+                    "checked_at": utcnow_iso(),
+                    "db_emails_before": (emails_before or ""),
+                    "db_emails_checked_at_before": (checked_before or ""),
+                }
+                out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-        conn.commit()
+                if processed % PRINT_EVERY == 0:
+                    rate = processed / max(1e-9, time.time() - start)
+                    print(f"[{processed}] hits={hits} misses={misses} fetch_fail={fetch_fail} | {rate:.1f}/s")
 
     except KeyboardInterrupt:
-        conn.commit()
-        print("\nAvbruten (Ctrl+C) — commit gjord ✅")
+        print("\nAvbruten (Ctrl+C) — filen är sparad ✅")
 
     finally:
         conn.close()
@@ -378,6 +483,7 @@ def main():
     print(f"HITS: {hits}")
     print(f"MISSES: {misses}")
     print(f"Fetch-fail: {fetch_fail}")
+    print(f"OUT: {OUT_PATH.resolve()}")
 
 
 if __name__ == "__main__":

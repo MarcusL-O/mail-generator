@@ -24,7 +24,7 @@ SHARD_TOTAL = args.shard_total
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/mail_generator_db.sqlite")
+DB_PATH = Path("data/companies.db.sqlite")
 
 OUT_PATH = Path(f"data/out/websites_guess_shard{SHARD_ID}.ndjson")  # <-- unik output per shard
 LIMIT = 0  # <-- antal att processa (0 = ALLA)
