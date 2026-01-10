@@ -1,3 +1,5 @@
+#Kollar iflal innehåll i ALLA shards ocj njson flyttas till db 
+
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone

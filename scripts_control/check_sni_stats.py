@@ -1,51 +1,84 @@
-import sqlite3
+# Kollar antal sni i hel db 
 
-DB_PATH = "data/companies.db.sqlite"
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from db_connection_path import DEFAULT_DB_PATH, connect, one, nonempty_sql, empty_sql, print_kv
 
 NO_SNI_MARK = "__NO_SNI__"
-BAD_SNI = "00000"  # räknas som "inte kollad"
+BAD_SNI = "00000"  # räknas som "inte kollad" / skräp
 
-con = sqlite3.connect(DB_PATH)
-cur = con.cursor()
 
-total = cur.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+def main() -> None:
+    ap = argparse.ArgumentParser(description="SNI stats for companies table")
+    ap.add_argument("--db", default=str(DEFAULT_DB_PATH), help="Path to sqlite db")
+    args = ap.parse_args()
 
-valid_sni = cur.execute(
-    """
-    SELECT COUNT(*)
-    FROM companies
-    WHERE TRIM(COALESCE(sni_codes,'')) != ''
-      AND TRIM(sni_codes) != ?
-      AND TRIM(sni_codes) != ?
-    """,
-    (NO_SNI_MARK, BAD_SNI),
-).fetchone()[0]
+    db_path = Path(args.db)
 
-no_sni = cur.execute(
-    """
-    SELECT COUNT(*)
-    FROM companies
-    WHERE TRIM(COALESCE(sni_codes,'')) = ?
-    """,
-    (NO_SNI_MARK,),
-).fetchone()[0]
+    con = connect(db_path)
+    cur = con.cursor()
 
-not_checked = cur.execute(
-    """
-    SELECT COUNT(*)
-    FROM companies
-    WHERE TRIM(COALESCE(sni_codes,'')) = ''
-       OR TRIM(sni_codes) = ?
-    """,
-    (BAD_SNI,),
-).fetchone()[0]
+    total = one(cur, "SELECT COUNT(*) FROM companies")
 
-checked_total = valid_sni + no_sni
+    valid_sni = one(
+        cur,
+        f"""
+        SELECT COUNT(*)
+        FROM companies
+        WHERE {nonempty_sql("sni_codes")}
+          AND TRIM(sni_codes) != ?
+          AND TRIM(sni_codes) != ?
+        """,
+        (NO_SNI_MARK, BAD_SNI),
+    )
 
-print("TOTAL:", total)
-print("CHECKED_TOTAL:", checked_total)
-print("VALID_SNI:", valid_sni)
-print("NO_SNI (__NO_SNI__):", no_sni)
-print("NOT_CHECKED_YET:", not_checked)
+    no_sni = one(
+        cur,
+        f"""
+        SELECT COUNT(*)
+        FROM companies
+        WHERE TRIM(COALESCE(sni_codes,'')) = ?
+        """,
+        (NO_SNI_MARK,),
+    )
 
-con.close()
+    bad_sni = one(
+        cur,
+        f"""
+        SELECT COUNT(*)
+        FROM companies
+        WHERE TRIM(COALESCE(sni_codes,'')) = ?
+        """,
+        (BAD_SNI,),
+    )
+
+    not_checked = one(
+        cur,
+        f"""
+        SELECT COUNT(*)
+        FROM companies
+        WHERE {empty_sql("sni_codes")}
+           OR TRIM(COALESCE(sni_codes,'')) = ?
+        """,
+        (BAD_SNI,),
+    )
+
+    checked_total = (valid_sni or 0) + (no_sni or 0)
+
+    print("=== SNI STATS ===")
+    print_kv("DB:", db_path)
+    print_kv("TOTAL_COMPANIES:", total)
+    print_kv("CHECKED_TOTAL:", checked_total)
+    print_kv("VALID_SNI:", valid_sni)
+    print_kv("NO_SNI (__NO_SNI__):", no_sni)
+    print_kv("BAD_SNI (00000):", bad_sni)
+    print_kv("NOT_CHECKED_YET:", not_checked)
+
+    con.close()
+
+
+if __name__ == "__main__":
+    main()
