@@ -1,0 +1,37 @@
+<!--
+CUST_Intro_Standard_Rak
+Karaktär: Rak, kort, allt på bordet. Neutral ton. MANUELL MITT fylls i per leverantör.
+-->
+<!doctype html>
+<html lang="sv">
+<head><meta charset="utf-8" /></head>
+<body>
+<p>Hej ({{ company_name }}),</p>
+
+<p>
+Jag heter Marcus och driver {{ your_company }}.
+</p>
+
+<p>
+Jag hör av mig eftersom vi hjälper företag att komma i kontakt med relevanta leverantörer,
+utan att behöva lägga tid på att leta eller jämföra själva.
+</p>
+
+<p>
+Det är helt kostnadsfritt att ta kontakt och ni avgör själva om ni vill gå vidare.
+</p>
+
+<!-- MANUELL MITT – fylls i per leverantör -->
+{{ manual_mid_html | default:"" }}
+
+<p>
+Om detta kan vara relevant, svara gärna på mejlet så tar vi det därifrån.
+</p>
+
+<p>
+Vänliga hälsningar<br/>
+Marcus<br/>
+{{ your_company }}
+</p>
+</body>
+</html>
