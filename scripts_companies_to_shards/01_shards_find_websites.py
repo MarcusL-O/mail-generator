@@ -26,10 +26,10 @@ SHARD_TOTAL = args.shard_total
 # =========================
 DB_PATH = Path("data/companies.db.sqlite")
 
-OUT_PATH = Path(f"data/out/websites_guess_shard{SHARD_ID}.ndjson")  # <-- unik output per shard
+OUT_PATH = Path(f"data/out/websites_guess_shard{SHARD_ID}.ndjson")  # <-- byt till test_shard om du vill
 LIMIT = 0  # <-- antal att processa (0 = ALLA)
 RESUME = True  # <-- hoppa över orgnr som redan finns i OUT_PATH
-PRINT_EVERY = 100
+PRINT_EVERY = 50
 # =========================
 
 TIMEOUT_SECONDS = 5
@@ -39,12 +39,14 @@ TLDS = ["se", "com"]
 
 REFRESH_DAYS = 90
 
-PARKED_KEYWORDS = [
+PARKED_STRONG = [
     "domain for sale",
     "buy this domain",
+    "domain is for sale",
     "köp domän",
     "köp domänen",
-    "this domain",
+]
+PARKED_WEAK = [
     "parked",
     "sedo",
     "afternic",
@@ -52,7 +54,7 @@ PARKED_KEYWORDS = [
     "one.com",
     "namecheap",
     "godaddy",
-    "domain is for sale",
+    "this domain",
 ]
 
 session = requests.Session()
@@ -119,6 +121,68 @@ def slug_hyphen(clean_name: str) -> str:
     return s if len(s) >= 4 else ""
 
 
+STOP_WORDS = {
+    "holding", "fastighet", "fastigheter", "konsult", "konsulting", "consulting",
+    "group", "gruppen", "förvaltning", "forvaltning", "management",
+    "service", "services", "solutions", "solution",
+    "invest", "investments", "investerare", "investeringar",
+    "trading", "transport", "bygg", "byggnad", "entreprenad",
+    "ab", "aktiebolag", "hb", "kb"
+}
+
+
+def _words(s: str) -> list[str]:
+    return [w for w in (s or "").split() if w]
+
+
+def _make_slug_from_words(words: list[str], hyphen: bool) -> str:
+    if not words:
+        return ""
+    txt = "-".join(words) if hyphen else "".join(words)
+    txt = re.sub(r"-+", "-", txt).strip("-")
+    return txt if len(txt) >= 3 else ""
+
+
+def slug_variants(clean_name: str) -> list[str]:
+    ws = _words(clean_name)
+    ws_f = [w for w in ws if w not in STOP_WORDS]
+
+    variants: list[str] = []
+
+    variants.append(slug_compact(clean_name))
+    variants.append(slug_hyphen(clean_name))
+
+    if ws_f:
+        variants.append(_make_slug_from_words(ws_f, hyphen=False))
+        variants.append(_make_slug_from_words(ws_f, hyphen=True))
+
+        variants.append(_make_slug_from_words(ws_f[:1], hyphen=False))
+        variants.append(_make_slug_from_words(ws_f[:1], hyphen=True))
+        variants.append(_make_slug_from_words(ws_f[:2], hyphen=False))
+        variants.append(_make_slug_from_words(ws_f[:2], hyphen=True))
+        variants.append(_make_slug_from_words(ws_f[:3], hyphen=False))
+        variants.append(_make_slug_from_words(ws_f[:3], hyphen=True))
+
+    initials = "".join([w[0] for w in ws_f if len(w) >= 2]) if ws_f else ""
+    if len(initials) >= 3:
+        variants.append(initials)
+        variants.append("-".join(list(initials)))
+
+    seen = set()
+    out = []
+    for v in variants:
+        v = (v or "").strip()
+        if not v:
+            continue
+        if len(v) > 40:
+            continue
+        if v not in seen:
+            seen.add(v)
+            out.append(v)
+
+    return out[:12]
+
+
 def domain_candidates(slugs: list[str]) -> list[str]:
     domains = []
     for slug in slugs:
@@ -147,10 +211,12 @@ def looks_like_html(headers: dict) -> bool:
 
 
 def is_parked_html(html_lower: str) -> bool:
-    return any(k in html_lower for k in PARKED_KEYWORDS)
+    if any(k in html_lower for k in PARKED_STRONG):
+        return True
+    weak_hits = sum(1 for k in PARKED_WEAK if k in html_lower)
+    return weak_hits >= 2
 
 
-# --- NYTT (minsta möjliga) ---
 def _valid_hostname(host: str) -> bool:
     if not host:
         return False
@@ -189,14 +255,59 @@ def _safe_url(url: str) -> bool:
         return _valid_hostname(host)
     except Exception:
         return False
-# --- /NYTT ---
 
 
-def fetch_probe(url: str) -> tuple[bool, bool]:
-    # --- NYTT (minsta möjliga) ---
+# =========
+# NYTT: nätverksklassning så vi kan logga 403/429/timeouts
+# =========
+def _is_retryable_status(code: int) -> bool:
+    # typisk throttling / temporärt
+    return code in (403, 429, 500, 502, 503, 504)
+
+
+def _head_ok(url: str) -> tuple[bool, bool, str]:
+    """
+    Returns (ok, is_html-ish, err_code)
+    err_code: "" | "403" | "429" | "timeout" | "other"
+    """
     if not _safe_url(url):
-        return (False, False)
-    # --- /NYTT ---
+        return (False, False, "other")
+
+    try:
+        r = session.head(
+            url,
+            timeout=(3, TIMEOUT_SECONDS),
+            allow_redirects=True,
+        )
+
+        if r.status_code == 405:
+            return (True, True, "")
+
+        if _is_retryable_status(r.status_code):
+            return (False, False, str(r.status_code))
+
+        if not (200 <= r.status_code < 400):
+            return (False, False, "")
+
+        return (True, looks_like_html(r.headers), "")
+
+    except (LocationParseError, InvalidURL):
+        return (False, False, "other")
+    except requests.Timeout:
+        return (False, False, "timeout")
+    except requests.RequestException:
+        return (False, False, "other")
+    except Exception:
+        return (False, False, "other")
+
+
+def _get_snippet_lower(url: str) -> tuple[str, str]:
+    """
+    Returns (snippet_lower, err_code)
+    err_code: "" | "403" | "429" | "timeout" | "other"
+    """
+    if not _safe_url(url):
+        return ("", "other")
 
     try:
         r = session.get(
@@ -206,37 +317,56 @@ def fetch_probe(url: str) -> tuple[bool, bool]:
             stream=True,
         )
 
+        if _is_retryable_status(r.status_code):
+            r.close()
+            return ("", str(r.status_code))
+
         if not (200 <= r.status_code < 400):
             r.close()
-            return (False, False)
+            return ("", "")
 
         if not looks_like_html(r.headers):
             r.close()
-            return (True, False)
+            return ("", "")
 
         chunk = r.raw.read(20_000, decode_content=True)
         r.close()
 
-        snippet = ""
         try:
-            snippet = (chunk.decode("utf-8", errors="ignore") or "").lower()
+            return ((chunk.decode("utf-8", errors="ignore") or "").lower(), "")
         except Exception:
-            snippet = ""
+            return ("", "other")
 
-        if snippet and is_parked_html(snippet):
-            return (True, True)
-
-        return (True, False)
-
-    # --- NYTT (minsta möjliga) ---
     except (LocationParseError, InvalidURL):
-        return (False, False)
-    except Exception:
-        # säkerhetsnät så scriptet aldrig dör
-        return (False, False)
-    # --- /NYTT ---
+        return ("", "other")
+    except requests.Timeout:
+        return ("", "timeout")
     except requests.RequestException:
-        return (False, False)
+        return ("", "other")
+    except Exception:
+        return ("", "other")
+
+
+def fetch_probe(url: str) -> tuple[bool, bool, str]:
+    """
+    Returns (ok, parked, err_code)
+    err_code: "" | "403" | "429" | "timeout" | "other"
+    """
+    ok, is_html, err = _head_ok(url)
+    if not ok:
+        return (False, False, err)
+
+    if not is_html:
+        return (True, False, "")
+
+    snippet, err2 = _get_snippet_lower(url)
+    if err2:
+        return (False, False, err2)
+
+    if snippet and is_parked_html(snippet):
+        return (True, True, "")
+
+    return (True, False, "")
 
 
 def pick_targets(conn: sqlite3.Connection, limit: Optional[int]) -> list[tuple[str, str, Optional[str], Optional[str]]]:
@@ -305,7 +435,6 @@ def main():
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     done = load_done_set(OUT_PATH) if RESUME else set()
-
     limit = None if LIMIT == 0 else LIMIT
 
     conn = sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True)
@@ -313,16 +442,17 @@ def main():
 
     targets = pick_targets(conn, limit)
 
-    # shard-filter
     targets = [(o, n, w, c) for (o, n, w, c) in targets if in_shard(o)]
 
-    # resume-filter
     if RESUME and done:
         targets = [(o, n, w, c) for (o, n, w, c) in targets if o not in done]
 
     print(f"Targets: {len(targets)} (LIMIT={LIMIT}, RESUME={RESUME}, SHARD={SHARD_ID}/{SHARD_TOTAL})")
 
     processed = hits = misses = parked_skips = 0
+    # NYTT: felräknare
+    err_403 = err_429 = err_timeout = err_other = 0
+
     start = time.time()
 
     try:
@@ -331,18 +461,33 @@ def main():
                 processed += 1
 
                 cleaned = clean_company_name(name)
-                slugs = [slug_compact(cleaned), slug_hyphen(cleaned)]
+                slugs = slug_variants(cleaned)
                 domains = domain_candidates(slugs)
 
                 found_url = None
                 status = "not_found"
 
+                # NYTT: om vi får retryable fel på alla försök -> skriv inte ut som done
+                had_retry_error = False
+
                 for domain in domains:
                     for url in url_variants(domain):
-                        ok, parked = fetch_probe(url)
+                        ok, parked, err = fetch_probe(url)
                         time.sleep(SLEEP_BETWEEN_REQUESTS)
 
                         if not ok:
+                            if err == "403":
+                                err_403 += 1
+                                had_retry_error = True
+                            elif err == "429":
+                                err_429 += 1
+                                had_retry_error = True
+                            elif err == "timeout":
+                                err_timeout += 1
+                                had_retry_error = True
+                            elif err:
+                                err_other += 1
+                                had_retry_error = True
                             continue
 
                         if parked:
@@ -361,21 +506,29 @@ def main():
                     hits += 1
                 else:
                     misses += 1
+                    # NYTT: om vi hade retry-fel men ingen träff => behandla som retry (inte done)
+                    if had_retry_error:
+                        status = "retry"
 
-                row = {
-                    "orgnr": orgnr,
-                    "name": name,
-                    "found_website": found_url or "",
-                    "status": status,
-                    "checked_at": utcnow_iso(),
-                    "db_website_before": (existing_website or ""),
-                    "db_checked_at_before": (existing_checked_at or ""),
-                }
-                out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                # NYTT: Om status är retry -> skriv INTE till OUT (så den kommer igen nästa gång)
+                if status != "retry":
+                    row = {
+                        "orgnr": orgnr,
+                        "name": name,
+                        "found_website": found_url or "",
+                        "status": status,
+                        "checked_at": utcnow_iso(),
+                        "db_website_before": (existing_website or ""),
+                        "db_checked_at_before": (existing_checked_at or ""),
+                    }
+                    out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
                 if processed % PRINT_EVERY == 0:
                     rate = processed / max(1e-9, time.time() - start)
-                    print(f"[{processed}] hits={hits} misses={misses} parked={parked_skips} | {rate:.1f}/s")
+                    print(
+                        f"[{processed}] hits={hits} misses={misses} parked={parked_skips} "
+                        f"403={err_403} 429={err_429} timeout={err_timeout} other={err_other} | {rate:.1f}/s"
+                    )
 
     except KeyboardInterrupt:
         print("\nAvbruten (Ctrl+C) — filen är sparad ✅")
@@ -385,6 +538,7 @@ def main():
 
     print("KLART ✅")
     print(f"Processade: {processed} | HITS: {hits} | MISSES: {misses} | Parked: {parked_skips}")
+    print(f"Errors: 403={err_403} 429={err_429} timeout={err_timeout} other={err_other}")
     print(f"OUT: {OUT_PATH.resolve()}")
 
 

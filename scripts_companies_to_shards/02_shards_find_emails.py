@@ -1,3 +1,5 @@
+# 30% hitrate men då körd 4 shards websidor och 4 shards mejl. kan påverka, det ser jag imorgon
+
 import re
 import time
 import json
@@ -55,11 +57,13 @@ CONTACT_KEYWORDS = [
     "om oss", "about", "about us",
 ]
 
+# fler vanliga paths (lågrisk, ofta payoff)
 CONTACT_PATH_HINTS = [
-    "/kontakt", "/kontakta-oss", "/kontakt-oss",
-    "/contact", "/contact-us",
-    "/support", "/help",
+    "/kontakt", "/kontakt/", "/kontakta", "/kontakta-oss", "/kontakt-oss",
+    "/contact", "/contact/", "/contact-us",
+    "/support", "/help", "/kundservice",
     "/om-oss", "/about", "/about-us",
+    "/om", "/om/", "/about/", "/company/contact",
 ]
 
 BLOCKLIST_PREFIXES = {"noreply", "no-reply", "donotreply", "do-not-reply", "example", "test"}
@@ -118,7 +122,6 @@ def same_domain(a: str, b: str) -> bool:
         return False
 
 
-# --- NYTT (minsta möjliga) ---
 def _valid_hostname(host: str) -> bool:
     if not host:
         return False
@@ -159,24 +162,33 @@ def _safe_url(url: str) -> bool:
         return _valid_hostname(host)
     except Exception:
         return False
-# --- /NYTT ---
 
 
-def fetch_html_snippet(url: str) -> Optional[str]:
+def _is_retryable_status(code: int) -> bool:
+    return code in (403, 429, 500, 502, 503, 504)
+
+
+def fetch_html_snippet(url: str) -> tuple[Optional[str], str]:
+    """
+    Returns (html, err_code)
+    err_code: "" | "403" | "429" | "timeout" | "other"
+    """
     url = normalize_url(url)
     if not url:
-        return None
+        return (None, "other")
 
-    # --- NYTT (minsta möjliga) ---
     if not _safe_url(url):
-        return None
-    # --- /NYTT ---
+        return (None, "other")
 
     for attempt in range(RETRY_COUNT + 1):
         try:
             with session.get(url, timeout=TIMEOUT_SEC, allow_redirects=True, stream=True) as r:
+                if _is_retryable_status(r.status_code):
+                    return (None, str(r.status_code))
+
                 if r.status_code >= 400:
-                    continue
+                    # riktiga 404/410/etc => ej retry
+                    return (None, "")
 
                 buf = bytearray()
                 for chunk in r.iter_content(chunk_size=8192):
@@ -187,16 +199,16 @@ def fetch_html_snippet(url: str) -> Optional[str]:
                         break
 
                 encoding = r.encoding or "utf-8"
-                return bytes(buf).decode(encoding, errors="ignore")
+                return (bytes(buf).decode(encoding, errors="ignore"), "")
 
-        # --- NYTT (minsta möjliga) ---
         except (LocationParseError, InvalidURL):
-            return None
-        # --- /NYTT ---
+            return (None, "other")
+        except requests.Timeout:
+            return (None, "timeout")
         except Exception:
             time.sleep(0.35 + attempt * 0.35)
 
-    return None
+    return (None, "other")
 
 
 def extract_emails_from_text(text: str) -> list[str]:
@@ -395,22 +407,21 @@ def main():
     done = load_done_set(OUT_PATH) if RESUME else set()
     limit = None if LIMIT == 0 else LIMIT
 
-    # Read-only connect => inga DB-locks mot andra scripts
     conn = sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True)
     conn.execute("PRAGMA journal_mode=WAL;")
 
     targets = pick_targets(conn, limit)
 
-    # shard-filter
     targets = [(o, n, w, e, c) for (o, n, w, e, c) in targets if in_shard(o)]
 
-    # resume-filter
     if RESUME and done:
         targets = [(o, n, w, e, c) for (o, n, w, e, c) in targets if o not in done]
 
     print(f"Targets: {len(targets)} (LIMIT={LIMIT}, RESUME={RESUME}, SHARD={SHARD_ID}/{SHARD_TOTAL})")
 
     processed = hits = misses = fetch_fail = 0
+    err_403 = err_429 = err_timeout = err_other = 0
+
     start = time.time()
 
     try:
@@ -421,31 +432,62 @@ def main():
 
                 found_emails: list[str] = []
                 status = "not_found"
+                had_retry_error = False
 
                 # 1) startsida
-                html_home = fetch_html_snippet(website)
+                html_home, err = fetch_html_snippet(website)
                 time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
+
+                if err:
+                    had_retry_error = True
+                    if err == "403":
+                        err_403 += 1
+                    elif err == "429":
+                        err_429 += 1
+                    elif err == "timeout":
+                        err_timeout += 1
+                    else:
+                        err_other += 1
 
                 if html_home:
                     found_emails = extract_emails_from_html(html_home)
                     found_emails = cap_emails(found_emails, MAX_EMAILS_PER_COMPANY)
 
-                    # 2) kontakt-länkar om inga emails på startsidan
-                    if not found_emails:
+                    # även om vi hittat något, försök förbättra via kontakt-länkar
+                    if len(found_emails) < MAX_EMAILS_PER_COMPANY:
                         contact_links = find_contact_links(website, html_home)
                         for link in contact_links:
-                            html_contact = fetch_html_snippet(link)
+                            html_contact, err2 = fetch_html_snippet(link)
                             time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
+
+                            if err2:
+                                had_retry_error = True
+                                if err2 == "403":
+                                    err_403 += 1
+                                elif err2 == "429":
+                                    err_429 += 1
+                                elif err2 == "timeout":
+                                    err_timeout += 1
+                                else:
+                                    err_other += 1
+
                             if not html_contact:
                                 continue
 
                             cand = extract_emails_from_html(html_contact)
-                            cand = cap_emails(cand, MAX_EMAILS_PER_COMPANY)
-                            if cand:
-                                found_emails = cand
+                            if not cand:
+                                continue
+
+                            merged = found_emails + cand
+                            found_emails = cap_emails(merged, MAX_EMAILS_PER_COMPANY)
+
+                            if len(found_emails) >= MAX_EMAILS_PER_COMPANY:
                                 break
                 else:
-                    fetch_fail += 1
+                    # endast counta som fetch_fail om vi inte har en retrybar felkod
+                    # (annars kör vi retry-logiken nedan)
+                    if not err:
+                        fetch_fail += 1
                     status = "fetch_failed"
 
                 if found_emails:
@@ -456,21 +498,30 @@ def main():
                     if status != "fetch_failed":
                         status = "not_found"
 
-                row = {
-                    "orgnr": orgnr,
-                    "name": name,
-                    "website": website,
-                    "status": status,
-                    "emails": ",".join(found_emails),
-                    "checked_at": utcnow_iso(),
-                    "db_emails_before": (emails_before or ""),
-                    "db_emails_checked_at_before": (checked_before or ""),
-                }
-                out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                    # retry om vi haft nätfel någonstans
+                    if had_retry_error:
+                        status = "retry"
+
+                # Om retry: skriv INTE till OUT => den kommer igen nästa körning
+                if status != "retry":
+                    row = {
+                        "orgnr": orgnr,
+                        "name": name,
+                        "website": website,
+                        "status": status,
+                        "emails": ",".join(found_emails),
+                        "checked_at": utcnow_iso(),
+                        "db_emails_before": (emails_before or ""),
+                        "db_emails_checked_at_before": (checked_before or ""),
+                    }
+                    out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
                 if processed % PRINT_EVERY == 0:
                     rate = processed / max(1e-9, time.time() - start)
-                    print(f"[{processed}] hits={hits} misses={misses} fetch_fail={fetch_fail} | {rate:.1f}/s")
+                    print(
+                        f"[{processed}] hits={hits} misses={misses} fetch_fail={fetch_fail} "
+                        f"403={err_403} 429={err_429} timeout={err_timeout} other={err_other} | {rate:.1f}/s"
+                    )
 
     except KeyboardInterrupt:
         print("\nAvbruten (Ctrl+C) — filen är sparad ✅")
@@ -483,6 +534,7 @@ def main():
     print(f"HITS: {hits}")
     print(f"MISSES: {misses}")
     print(f"Fetch-fail: {fetch_fail}")
+    print(f"Errors: 403={err_403} 429={err_429} timeout={err_timeout} other={err_other}")
     print(f"OUT: {OUT_PATH.resolve()}")
 
 
