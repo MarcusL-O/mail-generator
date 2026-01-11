@@ -246,19 +246,32 @@ def extract_emails_from_html(html: str) -> list[str]:
     if not html:
         return []
 
-    soup = BeautifulSoup(html, "html.parser")
-
     emails: list[str] = []
 
-    # 1) mailto:
-    for a in soup.select("a[href]"):
-        href = (a.get("href") or "").strip()
-        if href.lower().startswith("mailto:"):
-            mail = href.split(":", 1)[1].split("?", 1)[0].strip().lower()
-            if mail:
-                emails.append(mail)
+    # 1) Försök parse:a HTML (kan krascha på trasiga charrefs)
+    try:
+        soup = BeautifulSoup(html, "html.parser")
 
-    # 2) regex i HTML/text
+        # mailto:
+        for a in soup.select("a[href]"):
+            href = (a.get("href") or "").strip()
+            if href.lower().startswith("mailto:"):
+                mail = href.split(":", 1)[1].split("?", 1)[0].strip().lower()
+                if mail:
+                    emails.append(mail)
+
+        # extra: regex på synlig text också (bra vid obfuscation)
+        try:
+            text = soup.get_text(" ", strip=True)
+            emails.extend(extract_emails_from_text(text))
+        except Exception:
+            pass
+
+    except Exception:
+        # Fallback: om parsern failar, kör regex direkt på rå HTML
+        pass
+
+    # 2) Regex i rå HTML (alltid, även om soup funkade)
     emails.extend(extract_emails_from_text(html))
 
     # dedupe preserving order
@@ -303,23 +316,32 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
     if not html:
         return []
 
-    soup = BeautifulSoup(html, "html.parser")
-    candidates: list[str] = []
     base_url = normalize_url(base_url)
 
-    for a in soup.select("a[href]"):
-        href = (a.get("href") or "").strip()
-        text = (a.get_text(" ", strip=True) or "").strip().lower()
-        href_l = href.lower()
+    # Försök parse:a HTML, men låt aldrig detta krascha hela pipen
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        # Om parsing failar: vi kan fortfarande testa de vanliga path-hints
+        soup = None
 
-        if not href or href.startswith(("javascript:", "mailto:", "tel:")):
-            continue
+    candidates: list[str] = []
 
-        if any(k in text for k in CONTACT_KEYWORDS) or any(k in href_l for k in CONTACT_KEYWORDS):
-            full = urljoin(base_url, href)
-            if same_domain(base_url, full):
-                candidates.append(full)
+    if soup is not None:
+        for a in soup.select("a[href]"):
+            href = (a.get("href") or "").strip()
+            text = (a.get_text(" ", strip=True) or "").strip().lower()
+            href_l = href.lower()
 
+            if not href or href.startswith(("javascript:", "mailto:", "tel:")):
+                continue
+
+            if any(k in text for k in CONTACT_KEYWORDS) or any(k in href_l for k in CONTACT_KEYWORDS):
+                full = urljoin(base_url, href)
+                if same_domain(base_url, full):
+                    candidates.append(full)
+
+    # Lägg alltid till path-hints som fallback
     for path in CONTACT_PATH_HINTS:
         candidates.append(urljoin(base_url, path))
 
