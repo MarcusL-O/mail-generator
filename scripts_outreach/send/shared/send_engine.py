@@ -1,0 +1,1 @@
+# gemensam logik: select → render → send → log

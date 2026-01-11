@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # =========================
 # ÄNDRA HÄR
 # =========================
-CITY = "Stockholm"          # ex: "Göteborg", "Stockholm", "Malmö"
+CITY = "Göteborg"          # ex: "Göteborg", "Stockholm", "Malmö"
 PRINT_EVERY = 250           # progress
 SLEEP_SECONDS = float(os.getenv("SNI_SLEEP_SECONDS", "1.05"))  # ~60/min
 # =========================
