@@ -1,5 +1,6 @@
 # 30% hitrate men då körd 4 shards websidor och 4 shards mejl. kan påverka.
 # Denna version är "safe": DNS/resolve-fel räknas som vanlig miss (inte retry-loop)
+# Retry sker ENDAST på timeout (inte 403/429/other) för att inte fastna på WAF.
 
 import re
 import time
@@ -15,7 +16,7 @@ from urllib.parse import urljoin, urlparse, urlsplit
 import requests
 from bs4 import BeautifulSoup
 from urllib3.exceptions import LocationParseError
-from requests.exceptions import InvalidURL, ConnectionError  # NYTT
+from requests.exceptions import InvalidURL, ConnectionError
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--shard-id", type=int, required=True)
@@ -29,28 +30,25 @@ SHARD_TOTAL = args.shard_total
 # ÄNDRA HÄR
 # =========================
 DB_PATH = Path("data/companies.db.sqlite")
-OUT_PATH = Path(f"data/out/emails_found_shard{SHARD_ID}.ndjson")  # <-- unik output per shard
-LIMIT = 0  # antal att processa (0 = ALLA)
-RESUME = True  # hoppa över orgnr som redan finns i OUT_PATH
+OUT_PATH = Path(f"data/out/emails_found_shard{SHARD_ID}.ndjson")
+LIMIT = 0
+RESUME = True
 PRINT_EVERY = 100
 # =========================
 
-MAX_EMAILS_PER_COMPANY = 3  # ändra till 5 om du vill
+MAX_EMAILS_PER_COMPANY = 3
 
 # Nätverk
 TIMEOUT_SEC = 7
 RETRY_COUNT = 1
-SLEEP_BETWEEN_REQUESTS_SEC = 0.20  # <-- NYTT: lite långsammare för att minska block/timeout
+SLEEP_BETWEEN_REQUESTS_SEC = 0.20
 
-# Speed: läs bara första N bytes
 MAX_READ_BYTES = 80_000
 
 USER_AGENT = "Mozilla/5.0 (compatible; Didup-Mail-Finder/1.1)"
 
-# TTL/refresh
 REFRESH_DAYS = 180
 
-# Kontakt-sidor att leta efter (sv + eng)
 CONTACT_KEYWORDS = [
     "kontakt", "kontakta", "kontakt oss",
     "contact", "contact us",
@@ -58,7 +56,6 @@ CONTACT_KEYWORDS = [
     "om oss", "about", "about us",
 ]
 
-# fler vanliga paths (lågrisk, ofta payoff)
 CONTACT_PATH_HINTS = [
     "/kontakt", "/kontakt/", "/kontakta", "/kontakta-oss", "/kontakt-oss",
     "/contact", "/contact/", "/contact-us",
@@ -170,7 +167,6 @@ def _is_retryable_status(code: int) -> bool:
 
 
 def _is_dns_miss_error(e: Exception) -> bool:
-    # DNS/resolve-fel = behandla som vanlig miss (inte retry-loop)
     msg = str(e).lower()
     return (
         "failed to resolve" in msg
@@ -200,7 +196,6 @@ def fetch_html_snippet(url: str) -> tuple[Optional[str], str]:
                     return (None, str(r.status_code))
 
                 if r.status_code >= 400:
-                    # riktiga 404/410/etc => ej retry
                     return (None, "")
 
                 buf = bytearray()
@@ -219,7 +214,6 @@ def fetch_html_snippet(url: str) -> tuple[Optional[str], str]:
         except requests.Timeout:
             return (None, "timeout")
         except (ConnectionError, requests.RequestException) as e:
-            # NYTT: DNS/resolve-fel ska inte trigga retry-loop
             if _is_dns_miss_error(e):
                 return (None, "")
             return (None, "other")
@@ -269,7 +263,6 @@ def extract_emails_from_html(html: str) -> list[str]:
     try:
         soup = BeautifulSoup(html, "html.parser")
 
-        # mailto:
         for a in soup.select("a[href]"):
             href = (a.get("href") or "").strip()
             if href.lower().startswith("mailto:"):
@@ -277,7 +270,6 @@ def extract_emails_from_html(html: str) -> list[str]:
                 if mail:
                     emails.append(mail)
 
-        # regex på synlig text
         try:
             text = soup.get_text(" ", strip=True)
             emails.extend(extract_emails_from_text(text))
@@ -285,7 +277,6 @@ def extract_emails_from_html(html: str) -> list[str]:
             pass
 
     except Exception:
-        # Fallback: regex direkt på rå HTML
         pass
 
     emails.extend(extract_emails_from_text(html))
@@ -368,10 +359,6 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
 
 
 def pick_targets(conn: sqlite3.Connection, limit: Optional[int]) -> list[tuple[str, str, str, Optional[str], Optional[str]]]:
-    """
-    Return (orgnr, name, website, emails, emails_checked_at)
-    Hämtar bara de med website och som behöver refresh.
-    """
     cur = conn.cursor()
 
     if limit is None:
@@ -465,22 +452,29 @@ def main():
 
                 found_emails: list[str] = []
                 status = "not_found"
-                had_retry_error = False
+                err_reason = ""
+
+                # Retry ENDAST på timeout
+                had_timeout = False
 
                 # 1) startsida
                 html_home, err = fetch_html_snippet(website)
                 time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
 
                 if err:
-                    had_retry_error = True
                     if err == "403":
                         err_403 += 1
+                        err_reason = "403"
                     elif err == "429":
                         err_429 += 1
+                        err_reason = "429"
                     elif err == "timeout":
                         err_timeout += 1
+                        had_timeout = True
+                        err_reason = "timeout"
                     else:
                         err_other += 1
+                        err_reason = "other"
 
                 if html_home:
                     found_emails = extract_emails_from_html(html_home)
@@ -493,15 +487,23 @@ def main():
                             time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
 
                             if err2:
-                                had_retry_error = True
                                 if err2 == "403":
                                     err_403 += 1
+                                    if not err_reason:
+                                        err_reason = "403"
                                 elif err2 == "429":
                                     err_429 += 1
+                                    if not err_reason:
+                                        err_reason = "429"
                                 elif err2 == "timeout":
                                     err_timeout += 1
+                                    had_timeout = True
+                                    if not err_reason:
+                                        err_reason = "timeout"
                                 else:
                                     err_other += 1
+                                    if not err_reason:
+                                        err_reason = "other"
 
                             if not html_contact:
                                 continue
@@ -523,20 +525,24 @@ def main():
                 if found_emails:
                     hits += 1
                     status = "found"
+                    err_reason = ""
                 else:
                     misses += 1
                     if status != "fetch_failed":
                         status = "not_found"
 
-                    if had_retry_error:
+                    # retry bara timeout
+                    if had_timeout:
                         status = "retry"
 
+                # Om retry -> skriv INTE till OUT, så den kan köras om senare
                 if status != "retry":
                     row = {
                         "orgnr": orgnr,
                         "name": name,
                         "website": website,
-                        "status": status,
+                        "status": status,          # found / not_found / fetch_failed
+                        "err_reason": err_reason,  # 403/429/timeout/other/""
                         "emails": ",".join(found_emails),
                         "checked_at": utcnow_iso(),
                         "db_emails_before": (emails_before or ""),
@@ -553,7 +559,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nAvbruten (Ctrl+C) — filen är sparad ✅")
-
     finally:
         conn.close()
 

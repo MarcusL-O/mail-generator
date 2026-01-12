@@ -26,9 +26,9 @@ SHARD_TOTAL = args.shard_total
 # =========================
 DB_PATH = Path("data/companies.db.sqlite")
 
-OUT_PATH = Path(f"data/out/websites_guess_shard{SHARD_ID}.ndjson")  # <-- byt till test_shard om du vill
-LIMIT = 0  # <-- antal att processa (0 = ALLA)
-RESUME = True  # <-- hoppa över orgnr som redan finns i OUT_PATH
+OUT_PATH = Path(f"data/out/websites_guess_shard{SHARD_ID}.ndjson")
+LIMIT = 0  # 0 = ALLA
+RESUME = True
 PRINT_EVERY = 50
 # =========================
 
@@ -36,7 +36,6 @@ TIMEOUT_SECONDS = 10
 SLEEP_BETWEEN_REQUESTS = 0.2
 
 TLDS = ["se", "com"]
-
 REFRESH_DAYS = 90
 
 PARKED_STRONG = [
@@ -59,6 +58,7 @@ PARKED_WEAK = [
 
 session = requests.Session()
 session.headers.update({
+    # Kommentar: håll UA enkel/normal. Det här är “botigt” men ok.
     "User-Agent": f"Mozilla/5.0 (Didup-Site-Guesser/1.0; shard={SHARD_ID})"
 })
 
@@ -204,7 +204,7 @@ def domain_candidates(slugs: list[str]) -> list[str]:
 
 
 def url_variants(domain: str) -> list[str]:
-    # Endast https för mindre strul & färre requests
+    # Kommentar: bara https för färre requests
     return [f"https://{domain}"]
 
 
@@ -261,7 +261,7 @@ def _safe_url(url: str) -> bool:
 
 
 def _is_retryable_status(code: int) -> bool:
-    # typisk throttling / temporärt
+    # Kommentar: detta är “problem status”, men vi kommer INTE retrya dem längre
     return code in (403, 429, 500, 502, 503, 504)
 
 
@@ -291,7 +291,6 @@ def _head_ok(url: str) -> tuple[bool, bool, str]:
             allow_redirects=True,
         )
 
-        # HEAD inte tillåtet på många sajter -> fallback till GET
         if r.status_code == 405:
             try:
                 rg = session.get(
@@ -308,7 +307,6 @@ def _head_ok(url: str) -> tuple[bool, bool, str]:
                 if not (200 <= rg.status_code < 400):
                     return (False, False, "")
 
-                # vi vet att GET funkar, anta HTML-ish så vi kan snippet-testa
                 return (True, True, "")
             except requests.Timeout:
                 return (False, False, "timeout")
@@ -506,9 +504,10 @@ def main():
 
                 found_url = None
                 status = "not_found"
+                err_reason = ""  # Kommentar: spara varför vi missade
 
-                # Om vi får retry-fel (403/429/timeout/other) men ingen träff -> kör igen nästa gång
-                had_retry_error = False
+                # Kommentar: NU retryar vi ENDAST timeout (för att inte fastna på WAF)
+                had_timeout = False
 
                 for domain in domains:
                     for url in url_variants(domain):
@@ -518,16 +517,17 @@ def main():
                         if not ok:
                             if err == "403":
                                 err_403 += 1
-                                had_retry_error = True
+                                err_reason = "403"
                             elif err == "429":
                                 err_429 += 1
-                                had_retry_error = True
+                                err_reason = "429"
                             elif err == "timeout":
                                 err_timeout += 1
-                                had_retry_error = True
+                                had_timeout = True
+                                err_reason = "timeout"
                             elif err:
                                 err_other += 1
-                                had_retry_error = True
+                                err_reason = "other"
                             continue
 
                         if parked:
@@ -537,6 +537,7 @@ def main():
 
                         found_url = url
                         status = "found"
+                        err_reason = ""
                         break
 
                     if found_url:
@@ -546,16 +547,20 @@ def main():
                     hits += 1
                 else:
                     misses += 1
-                    if had_retry_error:
+                    # Kommentar: retry bara om vi hade timeout (tillfälligt)
+                    if had_timeout:
                         status = "retry"
+                    else:
+                        status = "not_found"
 
-                # Om status är retry -> skriv INTE till OUT, så den körs om nästa gång
+                # Kommentar: om retry -> skriv inte, så den kan köras om senare
                 if status != "retry":
                     row = {
                         "orgnr": orgnr,
                         "name": name,
                         "found_website": found_url or "",
-                        "status": status,
+                        "status": status,              # found / parked / not_found
+                        "err_reason": err_reason,      # 403 / 429 / timeout / other / ""
                         "checked_at": utcnow_iso(),
                         "db_website_before": (existing_website or ""),
                         "db_checked_at_before": (existing_checked_at or ""),
@@ -571,7 +576,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nAvbruten (Ctrl+C) — filen är sparad ✅")
-
     finally:
         conn.close()
 
