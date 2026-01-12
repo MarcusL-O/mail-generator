@@ -1,5 +1,5 @@
-#Kompleterar datan i DB med SNI-koder. 
-#Skickar till DB 
+#Kompleterar datan i DB med SNI-koder.
+#Skickar till DB
 
 import os
 import time
@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # =========================
 # ÄNDRA HÄR
 # =========================
-CITY = None          # ex: "Göteborg", "Stockholm", "Malmö"
+CITY = "all"         # ex: "Göteborg", "Stockholm", "Malmö" | "all" | "*" | "Stockholm,Göteborg"
 PRINT_EVERY = 250           # progress
 SLEEP_SECONDS = float(os.getenv("SNI_SLEEP_SECONDS", "1.05"))  # ~60/min
 # =========================
@@ -142,21 +142,45 @@ def main():
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_CITY} ON {TABLE}({COL_CITY});")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_SNI_CODES} ON {TABLE}({COL_SNI_CODES});")
 
+    # =========================
+    # ENDA ÄNDRINGEN: CITY-filter som stödjer None/all/* och flera städer
+    # =========================
+    city_raw = CITY
+    cities = None
+
+    if isinstance(city_raw, str):
+        city_raw = city_raw.strip()
+        if city_raw.lower() in ("all", "none", "*", ""):
+            cities = None
+        else:
+            cities = [c.strip() for c in city_raw.split(",") if c.strip()]
+    elif city_raw is None:
+        cities = None
+
+    where_city = ""
+    params = [NO_SNI_MARK, NOT_FOUND_MARK]
+
+    if cities:
+        placeholders = ",".join(["LOWER(?)"] * len(cities))
+        where_city = f"AND LOWER({COL_CITY}) IN ({placeholders})"
+        params.extend(cities)
+
     # Bara okollade / tomma / '00000' och INTE redan markerade
     cur.execute(
         f"""
         SELECT {COL_ORGNR}
         FROM {TABLE}
-        WHERE LOWER({COL_CITY}) = LOWER(?)
-          AND (
+        WHERE (
             {COL_SNI_CODES} IS NULL
             OR {COL_SNI_CODES} = ''
             OR {COL_SNI_CODES} = '00000'
-          )
-          AND COALESCE({COL_SNI_CODES}, '') NOT IN (?, ?)
+        )
+        AND COALESCE({COL_SNI_CODES}, '') NOT IN (?, ?)
+        {where_city}
         """,
-        (CITY, NO_SNI_MARK, NOT_FOUND_MARK),
+        params,
     )
+    # =========================
 
     orgnrs = [str(r[COL_ORGNR]).strip() for r in cur.fetchall() if r[COL_ORGNR]]
     total = len(orgnrs)
@@ -251,5 +275,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# python get_data/02_enrich_sni_import_db.py
