@@ -1,4 +1,5 @@
-# 30% hitrate men då körd 4 shards websidor och 4 shards mejl. kan påverka, det ser jag imorgon
+# 30% hitrate men då körd 4 shards websidor och 4 shards mejl. kan påverka.
+# Denna version är "safe": DNS/resolve-fel räknas som vanlig miss (inte retry-loop)
 
 import re
 import time
@@ -14,7 +15,7 @@ from urllib.parse import urljoin, urlparse, urlsplit
 import requests
 from bs4 import BeautifulSoup
 from urllib3.exceptions import LocationParseError
-from requests.exceptions import InvalidURL
+from requests.exceptions import InvalidURL, ConnectionError  # NYTT
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--shard-id", type=int, required=True)
@@ -39,7 +40,7 @@ MAX_EMAILS_PER_COMPANY = 3  # ändra till 5 om du vill
 # Nätverk
 TIMEOUT_SEC = 7
 RETRY_COUNT = 1
-SLEEP_BETWEEN_REQUESTS_SEC = 0.10
+SLEEP_BETWEEN_REQUESTS_SEC = 0.20  # <-- NYTT: lite långsammare för att minska block/timeout
 
 # Speed: läs bara första N bytes
 MAX_READ_BYTES = 80_000
@@ -168,6 +169,18 @@ def _is_retryable_status(code: int) -> bool:
     return code in (403, 429, 500, 502, 503, 504)
 
 
+def _is_dns_miss_error(e: Exception) -> bool:
+    # DNS/resolve-fel = behandla som vanlig miss (inte retry-loop)
+    msg = str(e).lower()
+    return (
+        "failed to resolve" in msg
+        or "name or service not known" in msg
+        or "nodename nor servname" in msg
+        or "getaddrinfo failed" in msg
+        or "temporary failure in name resolution" in msg
+    )
+
+
 def fetch_html_snippet(url: str) -> tuple[Optional[str], str]:
     """
     Returns (html, err_code)
@@ -205,6 +218,11 @@ def fetch_html_snippet(url: str) -> tuple[Optional[str], str]:
             return (None, "other")
         except requests.Timeout:
             return (None, "timeout")
+        except (ConnectionError, requests.RequestException) as e:
+            # NYTT: DNS/resolve-fel ska inte trigga retry-loop
+            if _is_dns_miss_error(e):
+                return (None, "")
+            return (None, "other")
         except Exception:
             time.sleep(0.35 + attempt * 0.35)
 
@@ -248,7 +266,6 @@ def extract_emails_from_html(html: str) -> list[str]:
 
     emails: list[str] = []
 
-    # 1) Försök parse:a HTML (kan krascha på trasiga charrefs)
     try:
         soup = BeautifulSoup(html, "html.parser")
 
@@ -260,7 +277,7 @@ def extract_emails_from_html(html: str) -> list[str]:
                 if mail:
                     emails.append(mail)
 
-        # extra: regex på synlig text också (bra vid obfuscation)
+        # regex på synlig text
         try:
             text = soup.get_text(" ", strip=True)
             emails.extend(extract_emails_from_text(text))
@@ -268,13 +285,11 @@ def extract_emails_from_html(html: str) -> list[str]:
             pass
 
     except Exception:
-        # Fallback: om parsern failar, kör regex direkt på rå HTML
+        # Fallback: regex direkt på rå HTML
         pass
 
-    # 2) Regex i rå HTML (alltid, även om soup funkade)
     emails.extend(extract_emails_from_text(html))
 
-    # dedupe preserving order
     out: list[str] = []
     seen: set[str] = set()
     for e in emails:
@@ -318,11 +333,9 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
 
     base_url = normalize_url(base_url)
 
-    # Försök parse:a HTML, men låt aldrig detta krascha hela pipen
     try:
         soup = BeautifulSoup(html, "html.parser")
     except Exception:
-        # Om parsing failar: vi kan fortfarande testa de vanliga path-hints
         soup = None
 
     candidates: list[str] = []
@@ -341,7 +354,6 @@ def find_contact_links(base_url: str, html: str) -> list[str]:
                 if same_domain(base_url, full):
                     candidates.append(full)
 
-    # Lägg alltid till path-hints som fallback
     for path in CONTACT_PATH_HINTS:
         candidates.append(urljoin(base_url, path))
 
@@ -433,7 +445,6 @@ def main():
     conn.execute("PRAGMA journal_mode=WAL;")
 
     targets = pick_targets(conn, limit)
-
     targets = [(o, n, w, e, c) for (o, n, w, e, c) in targets if in_shard(o)]
 
     if RESUME and done:
@@ -475,7 +486,6 @@ def main():
                     found_emails = extract_emails_from_html(html_home)
                     found_emails = cap_emails(found_emails, MAX_EMAILS_PER_COMPANY)
 
-                    # även om vi hittat något, försök förbättra via kontakt-länkar
                     if len(found_emails) < MAX_EMAILS_PER_COMPANY:
                         contact_links = find_contact_links(website, html_home)
                         for link in contact_links:
@@ -506,8 +516,6 @@ def main():
                             if len(found_emails) >= MAX_EMAILS_PER_COMPANY:
                                 break
                 else:
-                    # endast counta som fetch_fail om vi inte har en retrybar felkod
-                    # (annars kör vi retry-logiken nedan)
                     if not err:
                         fetch_fail += 1
                     status = "fetch_failed"
@@ -520,11 +528,9 @@ def main():
                     if status != "fetch_failed":
                         status = "not_found"
 
-                    # retry om vi haft nätfel någonstans
                     if had_retry_error:
                         status = "retry"
 
-                # Om retry: skriv INTE till OUT => den kommer igen nästa körning
                 if status != "retry":
                     row = {
                         "orgnr": orgnr,

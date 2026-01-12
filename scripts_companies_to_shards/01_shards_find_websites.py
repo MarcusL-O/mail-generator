@@ -11,7 +11,7 @@ import argparse
 import requests
 from urllib.parse import urlsplit
 from urllib3.exceptions import LocationParseError
-from requests.exceptions import InvalidURL
+from requests.exceptions import InvalidURL, ConnectionError
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--shard-id", type=int, required=True)
@@ -32,8 +32,8 @@ RESUME = True  # <-- hoppa över orgnr som redan finns i OUT_PATH
 PRINT_EVERY = 50
 # =========================
 
-TIMEOUT_SECONDS = 5
-SLEEP_BETWEEN_REQUESTS = 0.05
+TIMEOUT_SECONDS = 10
+SLEEP_BETWEEN_REQUESTS = 0.2
 
 TLDS = ["se", "com"]
 
@@ -58,7 +58,9 @@ PARKED_WEAK = [
 ]
 
 session = requests.Session()
-session.headers.update({"User-Agent": "Mozilla/5.0 (Didup-Site-Guesser/1.0)"})
+session.headers.update({
+    "User-Agent": f"Mozilla/5.0 (Didup-Site-Guesser/1.0; shard={SHARD_ID})"
+})
 
 
 def utcnow_iso() -> str:
@@ -202,7 +204,8 @@ def domain_candidates(slugs: list[str]) -> list[str]:
 
 
 def url_variants(domain: str) -> list[str]:
-    return [f"https://{domain}", f"http://{domain}"]
+    # Endast https för mindre strul & färre requests
+    return [f"https://{domain}"]
 
 
 def looks_like_html(headers: dict) -> bool:
@@ -257,12 +260,20 @@ def _safe_url(url: str) -> bool:
         return False
 
 
-# =========
-# NYTT: nätverksklassning så vi kan logga 403/429/timeouts
-# =========
 def _is_retryable_status(code: int) -> bool:
     # typisk throttling / temporärt
     return code in (403, 429, 500, 502, 503, 504)
+
+
+def _is_dns_miss_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return (
+        "name or service not known" in msg
+        or "failed to resolve" in msg
+        or "nodename nor servname" in msg
+        or "temporary failure in name resolution" in msg
+        or "getaddrinfo failed" in msg
+    )
 
 
 def _head_ok(url: str) -> tuple[bool, bool, str]:
@@ -280,8 +291,31 @@ def _head_ok(url: str) -> tuple[bool, bool, str]:
             allow_redirects=True,
         )
 
+        # HEAD inte tillåtet på många sajter -> fallback till GET
         if r.status_code == 405:
-            return (True, True, "")
+            try:
+                rg = session.get(
+                    url,
+                    timeout=(3, TIMEOUT_SECONDS),
+                    allow_redirects=True,
+                    stream=True,
+                )
+                rg.close()
+
+                if _is_retryable_status(rg.status_code):
+                    return (False, False, str(rg.status_code))
+
+                if not (200 <= rg.status_code < 400):
+                    return (False, False, "")
+
+                # vi vet att GET funkar, anta HTML-ish så vi kan snippet-testa
+                return (True, True, "")
+            except requests.Timeout:
+                return (False, False, "timeout")
+            except (ConnectionError, requests.RequestException) as e:
+                if _is_dns_miss_error(e):
+                    return (False, False, "")
+                return (False, False, "other")
 
         if _is_retryable_status(r.status_code):
             return (False, False, str(r.status_code))
@@ -295,9 +329,13 @@ def _head_ok(url: str) -> tuple[bool, bool, str]:
         return (False, False, "other")
     except requests.Timeout:
         return (False, False, "timeout")
-    except requests.RequestException:
+    except (ConnectionError, requests.RequestException) as e:
+        if _is_dns_miss_error(e):
+            return (False, False, "")
         return (False, False, "other")
-    except Exception:
+    except Exception as e:
+        if _is_dns_miss_error(e):
+            return (False, False, "")
         return (False, False, "other")
 
 
@@ -341,9 +379,13 @@ def _get_snippet_lower(url: str) -> tuple[str, str]:
         return ("", "other")
     except requests.Timeout:
         return ("", "timeout")
-    except requests.RequestException:
+    except (ConnectionError, requests.RequestException) as e:
+        if _is_dns_miss_error(e):
+            return ("", "")
         return ("", "other")
-    except Exception:
+    except Exception as e:
+        if _is_dns_miss_error(e):
+            return ("", "")
         return ("", "other")
 
 
@@ -441,7 +483,6 @@ def main():
     conn.execute("PRAGMA journal_mode=WAL;")
 
     targets = pick_targets(conn, limit)
-
     targets = [(o, n, w, c) for (o, n, w, c) in targets if in_shard(o)]
 
     if RESUME and done:
@@ -450,7 +491,6 @@ def main():
     print(f"Targets: {len(targets)} (LIMIT={LIMIT}, RESUME={RESUME}, SHARD={SHARD_ID}/{SHARD_TOTAL})")
 
     processed = hits = misses = parked_skips = 0
-    # NYTT: felräknare
     err_403 = err_429 = err_timeout = err_other = 0
 
     start = time.time()
@@ -467,7 +507,7 @@ def main():
                 found_url = None
                 status = "not_found"
 
-                # NYTT: om vi får retryable fel på alla försök -> skriv inte ut som done
+                # Om vi får retry-fel (403/429/timeout/other) men ingen träff -> kör igen nästa gång
                 had_retry_error = False
 
                 for domain in domains:
@@ -506,11 +546,10 @@ def main():
                     hits += 1
                 else:
                     misses += 1
-                    # NYTT: om vi hade retry-fel men ingen träff => behandla som retry (inte done)
                     if had_retry_error:
                         status = "retry"
 
-                # NYTT: Om status är retry -> skriv INTE till OUT (så den kommer igen nästa gång)
+                # Om status är retry -> skriv INTE till OUT, så den körs om nästa gång
                 if status != "retry":
                     row = {
                         "orgnr": orgnr,
