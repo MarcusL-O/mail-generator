@@ -15,7 +15,7 @@ import re
 # ÄNDRA HÄR
 # =========================
 BULK_FILE = "data/raw/bolagsverket_bulkfil.zip"
-CITY = "Stockholm"         # ex: "Stockholm", "Malmö"
+CITY = "Malmö"         # ex: "Stockholm", "Malmö"
 BATCH_LIMIT = None         # None = ingen limit, annars t.ex. 10
 PRINT_EVERY = 10000         
 # =========================
