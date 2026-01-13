@@ -16,8 +16,8 @@ import re
 # =========================
 BULK_FILE = "data/raw/bolagsverket_bulkfil.zip"
 CITY = "Malmö"         # ex: "Stockholm", "Malmö"
-BATCH_LIMIT = None         # None = ingen limit, annars t.ex. 10
-PRINT_EVERY = 10000         
+BATCH_LIMIT = None     # None = ingen limit
+PRINT_EVERY = 10000
 # =========================
 
 DB_PATH = os.getenv("DB_PATH", "data/companies.db.sqlite")
@@ -40,7 +40,6 @@ def clean_bulk_value(s: str) -> str:
     s = (s or "").strip().strip('"')
     if not s:
         return ""
-    # Ta bort metadata efter första $
     if "$" in s:
         s = s.split("$", 1)[0].strip()
     return s
@@ -61,7 +60,10 @@ def _to_iso_date(s: str) -> str:
         return ""
     if len(s) >= 10 and s[4] == "-" and s[7] == "-":
         return s[:10]
-    for fmt in ("%Y%m%d", "%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y", "%Y.%m.%d", "%d.%m.%Y"):
+    for fmt in (
+        "%Y%m%d", "%Y-%m-%d", "%Y/%m/%d",
+        "%d/%m/%Y", "%d-%m-%Y", "%Y.%m.%d", "%d.%m.%Y"
+    ):
         try:
             return datetime.strptime(s[:10], fmt).date().isoformat()
         except ValueError:
@@ -76,13 +78,6 @@ def normalize_city(s: str) -> str:
 
 
 def extract_city_from_postadress(postadress: str) -> str:
-    """
-    I din bulk ligger ofta postadress som:
-      "Box 7435$$STOCKHOLM"
-      "Järnvågsgatan 3$c/o X$GÖTEBORG$$SE-LAND"
-    Vi tar texten efter sista '$$' om den finns, annars jobbar vi med hela.
-    Sen rensar vi metadata efter '$', tar bort postnummer och städar whitespace.
-    """
     s = (postadress or "").strip().strip('"')
     if not s:
         return ""
@@ -115,6 +110,9 @@ def city_matches(postadress: str, wanted_city: str) -> bool:
     return False
 
 
+# =========================
+# ROBUST FIL-INLÄSNING (NUL-safe)
+# =========================
 def _iter_text_lines(path: Path):
     if path.suffix.lower() == ".zip":
         with zipfile.ZipFile(path, "r") as z:
@@ -123,11 +121,16 @@ def _iter_text_lines(path: Path):
                 raise SystemExit("ZIP contains no files.")
             with z.open(names[0], "r") as f:
                 for raw in f:
-                    yield raw.decode("utf-8", errors="replace")
+                    line = raw.decode("utf-8", errors="replace")
+                    if "\x00" in line:
+                        continue
+                    yield line
         return
 
     with path.open("r", encoding="utf-8", errors="replace") as f:
         for line in f:
+            if "\x00" in line:
+                continue
             yield line
 
 
@@ -192,7 +195,6 @@ def main():
     con.execute("PRAGMA journal_mode=WAL;")
     cur = con.cursor()
 
-    # index för snabb exists-check
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_ORGNR} ON {TABLE}({COL_ORGNR});")
 
     def exists_orgnr(orgnr: str) -> bool:
@@ -217,7 +219,6 @@ def main():
 
                 matched_city += 1
 
-                # INSERT ONLY: skriv ALDRIG över
                 if exists_orgnr(orgnr):
                     skipped_exists += 1
                     continue
@@ -278,5 +279,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# python get_data/01_bulk_city_import_db.py
