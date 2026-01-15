@@ -1,11 +1,8 @@
-#Skapar lokal preview av mejl.
-#Används för test innan skick.
-#Kör render_email()
-#Skriver HTML-outputen till en .html-fil
-#Du öppnar filen i webbläsaren och ser exakt hur mejlet kommer se ut
-#Varför det är viktigt:
-#Du ser att placeholders, radbrytningar och signature ser rätt ut
-#Du felsöker utan att skicka mejl
+# Skapar lokal preview av mejl.
+# Används för test innan skick.
+# Kör render_email()
+# Skriver HTML-outputen till en .html-fil
+# Du öppnar filen i webbläsaren och ser exakt hur mejlet kommer se ut
 
 import argparse
 from pathlib import Path
@@ -14,35 +11,46 @@ from datetime import datetime
 from render_email import render_email
 
 
+def safe(s: str) -> str:
+    # Kommentar (svenska): Gör strängar filnamnssäkra
+    return "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in s)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--template", required=True, help="Template name i DB, ex: email_customer_intro/A.html")
-    ap.add_argument("--out", default="", help="Output path .html (valfritt)")
-    ap.add_argument("--company-name", default="Demo AB")
+    ap.add_argument("--template", required=True, help="Template name i DB")
+    ap.add_argument("--company-name", default="Demo_AB")
     ap.add_argument("--contact-name", default="Anna")
-    ap.add_argument("--your-company", default="Din Firma")
+    ap.add_argument("--your-company", default="Din_Firma")
     ap.add_argument("--city", default="Göteborg")
     ap.add_argument("--industry-or-service", default="IT-konsult")
     ap.add_argument("--your-contact-info", default="marcus@example.com")
     args = ap.parse_args()
 
     context = {
-        "company_name": args.company_name,
+        "company_name": args.company_name.replace("_", " "),
         "contact_name": args.contact_name,
-        "your_company": args.your_company,
+        "your_company": args.your_company.replace("_", " "),
         "city": args.city,
         "industry_or_service": args.industry_or_service,
         "your_contact_info": args.your_contact_info,
     }
 
-    subject, html, _txt = render_email(template_name=args.template, context=context)
-
-    out_path = Path(args.out) if args.out else Path(
-        f"data/out/preview_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+    subject, html, _txt = render_email(
+        template_name=args.template,
+        context=context
     )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Kommentar (svenska): Wrap så du kan öppna filen direkt i browser.
+    # Kommentar (svenska): Filnamn: datum_template_företag.html
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    tpl = safe(args.template.replace(".html", "").replace(".txt", "").replace("/", "_"))
+    company = safe(args.company_name)
+
+    out_dir = Path("data/out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    out_path = out_dir / f"{stamp}_{tpl}_{company}.html"
+
     wrapped = f"""<!doctype html>
 <html lang="sv">
 <head>
@@ -50,7 +58,7 @@ def main():
   <title>{subject}</title>
 </head>
 <body>
-  {html}
+{html}
 </body>
 </html>
 """
