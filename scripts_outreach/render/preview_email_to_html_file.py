@@ -29,7 +29,6 @@ def main():
 
     context = {
         "company_name": args.company_name.replace("_", " "),
-        "contact_name": args.contact_name,
         "your_company": args.your_company.replace("_", " "),
         "city": args.city,
         "industry_or_service": args.industry_or_service,

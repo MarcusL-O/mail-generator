@@ -135,7 +135,6 @@ if __name__ == "__main__":
     demo_template = "email_customer_intro/A.html"
     demo_context = {
         "company_name": "Demo AB",
-        "contact_name": "Anna",
         "your_company": "Din Firma",
         "city": "Göteborg",
         "industry_or_service": "IT-konsult",

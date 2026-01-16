@@ -12,7 +12,7 @@ BAD_SNI = "00000"
 # ÄNDRA HÄR
 # =========================
 CITY = "Göteborg"
-SNI_LIST = ["43320", "41200"]  # en eller flera
+SNI_LIST = ["69201"]  # en eller flera
 
 
 def main() -> None:
