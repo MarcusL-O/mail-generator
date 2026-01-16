@@ -1,0 +1,63 @@
+FÄRDIG PRODUKT – NY MASTERPLAN
+
+Utveckla klart all logik     ---KLAR
+Lägg alla relevanta triggers/filters
+ -1: hemsida score, 1-10, hur bra den är. ---KLAR
+ -2: om dem letar kollegor.       ---KLAR
+ -3: tekniskt fotavtryck, om dem behöver support, avänder 365 , micorosft ecosystem kolla
+ -4 statestikmyndingheten öppet api
+ -4bger antal anställda
+ -4c bättre targeting ? nytt script sortera upp bättre så jag har rätt antal cites. 
+ -4d status om bolaget är nerlagt
+ - om det är ab eller enksilt osv 
+ 4-e kan få komun och län också
+ -f skatt också men det kankse är onödigt ?
+ -5 fixa från bolagsverket så att du får bra datum på alla kolla var 90 dag eller ngt efter nya ? bolag?
+ -5 via scb kan du hämta nyregistrerade bolag varje månda/kvartal
+ -6 offentlig vs privat sektor det är bra7- antal arbetställen 
+
+-5 SCB arbetställen- ger komun/ region ex. västra götaland osv --ingen api nyckel--bara att köra --den på 4:an kan hitta samam kör på den
+Förbättra targeting per uppdrag/leverantör
+Inför poängsystem (konfigurerbart, ej hårt krav)
+Implementera stopp-logik (stopped_reason som central sanning)
+Implementera bounce-hantering (hard/soft → stoppa direkt)
+Implementera complaint-hantering (spam → do_not_contact + stoppa kampanj)
+Implementera unsubscribe (länk → do_not_contact, ingen UI)
+Implementera sändhastighet (global + per kampanj)
+Implementera warmup-logik (lågt → upptrappning)
+Testa allt via dry-run + simuleringar
+Verifiera DB-state före/efter varje scenario
+Dokumentera flödet tydligt (för dig + pitch)
+
+SUPPLIER – JURIDIK & AFFÄR
+
+Skriv standardavtal för leverantörer
+Definiera ersättning per bokat möte
+Definiera success fee vid affär
+Definiera när betalningsskyldighet uppstår
+Definiera tidsperiod för affär (ex: 6–12 månader efter möte)
+Definiera rapporteringsskyldighet från leverantör
+Definiera rätt till uppföljning och revision vid behov
+HUR DU VET ATT AFFÄR SKETT (KRITISK DEL)
+
+Kräv avtalad rapportering från leverantör
+Knyt affär till orgnr + mötes-ID
+Logga bokat möte i systemet
+Affär bekräftas manuellt av leverantör
+Affär markeras i systemet via mark_deal
+Tidsfönster styr om affären är provisionsgrundande
+Ingen veckovis mejljakt behövs
+
+OPERATIV MODELL (REALISTISK)
+
+Du äger sanningen i systemet
+Leverantören har rapporteringsansvar
+Systemet stoppar och loggar – människor bekräftar affärer
+Långa säljcykler hanteras via tidsregler, inte påminnelsemejl
+
+SLUTSTATUS
+
+Systemet är färdigutvecklat
+Kräver bara operativ setup + tester
+Redo för pitch
+Redo för live när beslut tas
