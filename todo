@@ -4,7 +4,22 @@ Utveckla klart all logik     ---KLAR
 Lägg alla relevanta triggers/filters
  -1: hemsida score, 1-10, hur bra den är. ---KLAR
  -2: om dem letar kollegor.       ---KLAR
- -3: tekniskt fotavtryck, om dem behöver support, avänder 365 , micorosft ecosystem kolla
+ -3: tekniskt fotavtryck, om dem behöver support, avänder 365 , micorosft ecosystem kolla      ---KLAR
+
+SCB (öppet API / Statistikmyndigheten)   -----klar men saknar nyckel 
+- Antal anställda (senaste tillgängliga)
+- Antal arbetsställen (workplaces)
+- Kommun + län/region (t.ex. Västra Götaland)
+
+Bolagsverket
+- Bolagsform (AB / HB / KB / Enskild firma / osv)
+- Status: aktivt vs avregistrerat/nerlagt
+- Registreringsdatum / ändringsdatum (för bra “freshness” och urval)
+- Nyregistrerade bolag (hämtas månadsvis/kvartalsvis via SCB, men Bolagsverket kan ge bättre datum per bolag)
+- Offentlig vs privat sektor ( vet inte om det är SCB eller bolagsverket)
+
+
+-gamla 
  -4 statestikmyndingheten öppet api
  -4bger antal anställda
  -4c bättre targeting ? nytt script sortera upp bättre så jag har rätt antal cites. 
@@ -15,8 +30,10 @@ Lägg alla relevanta triggers/filters
  -5 fixa från bolagsverket så att du får bra datum på alla kolla var 90 dag eller ngt efter nya ? bolag?
  -5 via scb kan du hämta nyregistrerade bolag varje månda/kvartal
  -6 offentlig vs privat sektor det är bra7- antal arbetställen 
+ -5 SCB arbetställen- ger komun/ region ex. västra götaland osv --ingen api nyckel--bara att köra --den på 4:an kan hitta samam kör på den
+-gamla
 
--5 SCB arbetställen- ger komun/ region ex. västra götaland osv --ingen api nyckel--bara att köra --den på 4:an kan hitta samam kör på den
+
 Förbättra targeting per uppdrag/leverantör
 Inför poängsystem (konfigurerbart, ej hårt krav)
 Implementera stopp-logik (stopped_reason som central sanning)
@@ -54,6 +71,9 @@ Du äger sanningen i systemet
 Leverantören har rapporteringsansvar
 Systemet stoppar och loggar – människor bekräftar affärer
 Långa säljcykler hanteras via tidsregler, inte påminnelsemejl
+
+sätt upp mallar på vad du vill ha från leverantör / customer 
+bra att kolla på när du amnuellt mejlar, för att få all info du behöver för att göra affär
 
 SLUTSTATUS
 
