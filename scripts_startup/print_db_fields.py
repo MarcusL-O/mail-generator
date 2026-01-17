@@ -2,8 +2,8 @@ import sqlite3
 from pathlib import Path
 
 # Svensk kommentar: ändra bara sökvägarna om dina DB ligger någon annanstans
-COMPANIES_DB = Path("data/companies.db.sqlite")
-OUTREACH_DB  = Path("data/outreach.db.sqlite")
+COMPANIES_DB = Path("data/db/companies.db.sqlite")
+OUTREACH_DB  = Path("data/db/outreach.db.sqlite")
 
 def show_table(conn, table: str):
     cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
