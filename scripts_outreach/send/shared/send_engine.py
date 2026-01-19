@@ -1,9 +1,10 @@
+# scripts_outreach/send/engine.py
 # gemensam logik: select → render → send → log
-#välja vilka leads som är “due” för en kampanj
-#hitta rätt template för step+variant
-#kalla render_email()
-#i dry-run: bara logga email_messages + events (ingen SMTP)
-#uppdatera lead/queue-state (t.ex. lead_campaigns.current_step, next_send_at) senare när vi spikar flödet
+# - välja vilka leads som är “due” för en kampanj
+# - hitta rätt template för step+variant
+# - kalla render_email()
+# - i dry-run: bara logga email_messages (ingen SMTP)
+# - (valfritt) advance_state: uppdatera step/next_send_at
 
 import argparse
 import sqlite3
@@ -17,7 +18,6 @@ from scripts_outreach.send.shared.send_utils import (
     is_dry_run,
     choose_primary_email,
     upsert_email_message,
-    insert_event,
     now_iso,
 )
 
@@ -107,6 +107,35 @@ def _build_context_from_lead(row: sqlite3.Row, con: sqlite3.Connection) -> dict:
     }
 
 
+def _setting_bool(con: sqlite3.Connection, key: str, default: str = "0") -> bool:
+    v = (get_setting(con, key, default) or default).strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
+
+
+def _build_order_by(con: sqlite3.Connection) -> str:
+    """
+    Kommentar (svenska):
+    Bygger ORDER BY baserat på settings:
+      - prioritize_tier: tier 1 först, NULL sist
+      - prioritize_score: hög score först inom tier
+    Fallback alltid: next_send_at ASC, lead_campaign_id ASC
+    """
+    prioritize_tier = _setting_bool(con, "prioritize_tier", "1")
+    prioritize_score = _setting_bool(con, "prioritize_score", "1")
+
+    parts = []
+    if prioritize_tier:
+        # SQLite: NULL sist via (tier IS NULL) ASC
+        parts.append("(lc.tier IS NULL) ASC")
+        parts.append("lc.tier ASC")
+    if prioritize_score:
+        parts.append("lc.score DESC")
+
+    parts.append("lc.next_send_at ASC")
+    parts.append("lc.id ASC")
+    return " ORDER BY " + ", ".join(parts)
+
+
 def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
     con = connect_db()
     try:
@@ -116,18 +145,25 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
 
         campaign_id = _get_campaign_id(con, campaign_name)
 
+        # Kommentar (svenska): om limit inte skickas in kan du låta settings styra senare.
+        # Här håller vi din CLI-logik intakt.
         now = now_iso()
         cur = con.cursor()
 
+        order_by_sql = _build_order_by(con)
+
         # Kommentar (svenska): hämta leads i kö som är 'due'
         cur.execute(
-            """
+            f"""
             SELECT
               lc.id               AS lead_campaign_id,
               lc.lead_id          AS lead_id,
               lc.current_step     AS current_step,
               lc.current_variant  AS current_variant,
               lc.next_send_at     AS next_send_at,
+              lc.tier             AS tier,
+              lc.score            AS score,
+
               l.orgnr             AS orgnr,
               l.company_name      AS company_name,
               l.city              AS city,
@@ -141,7 +177,7 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
               AND lc.stopped_reason IS NULL
               AND (lc.next_send_at IS NULL OR lc.next_send_at <= ?)
               AND l.status NOT IN ('do_not_contact')
-            ORDER BY lc.id ASC
+            {order_by_sql}
             LIMIT ?
             """,
             (campaign_id, now, limit),
@@ -175,7 +211,7 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
             subject, html, txt = render_email(template_name=template_name, context=context)
 
             # Kommentar (svenska): I dry-run loggar vi bara email_messages som "queued"
-            message_id = upsert_email_message(
+            _message_id = upsert_email_message(
                 con,
                 lead_id=int(r["lead_id"]),
                 campaign_id=campaign_id,
@@ -191,9 +227,6 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
                 sent_at=None,
                 error=None,
             )
-
-            # Kommentar (svenska): Vi loggar INTE event 'sent' i dry-run (det vore lögn).
-            # Om du vill ha spårning i dry-run kan vi lägga meta i email_messages senare.
 
             created += 1
 
@@ -215,7 +248,7 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
                     (step + 1, variant, next_send, now, int(r["lead_campaign_id"])),
                 )
 
-            # commit löpande så du alltid ser resultat i DB
+            # Kommentar (svenska): commit per lead (robust). Optimera senare om du vill.
             con.commit()
 
         print("DONE ✅")

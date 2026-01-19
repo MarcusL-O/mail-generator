@@ -1,18 +1,18 @@
+# scripts_outreach/send/shared/send_utils.py
 # helpers: batch, throttling, dry-run, etc
-#kopplar upp mot outreach.db
-#läser settings (limits, dry-run, etc.)
-#tolkar emails (JSON, CSV eller single)
-#väljer primär mottagar-email
-#skapar rader i email_messages (loggar varje utskick/försök)
-#loggar händelser i events
-#hanterar timestamps och output-mappar
-
+# kopplar upp mot outreach.db
+# läser settings (limits, dry-run, etc.)
+# tolkar emails (JSON, CSV eller single)
+# väljer primär mottagar-email
+# skapar rader i email_messages (loggar varje utskick/försök)
+# loggar händelser i events
+# hanterar timestamps och output-mappar
 
 import json
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any, Dict, Optional, List
 
 OUTREACH_DB_PATH = Path("data/db/outreach.db.sqlite")
 
