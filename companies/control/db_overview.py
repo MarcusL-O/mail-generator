@@ -1,33 +1,42 @@
 # companies/control/db_overview.py
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Iterable
-
 import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable
 
-from db_connection_path import (
-    DEFAULT_DB_PATH,
-    connect,
-    one,
-    print_kv,
-    nonempty_sql,
-)
+# =========================
+# KONFIG (samma stil som shards/apply)
+# =========================
+DB_PATH = Path("data/db/companies.db.sqlite")
+# =========================
 
 
 def utc_now_str() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def print_section(title: str) -> None:
+    print("\n" + title)
+    print("-" * len(title))
+
+
+def print_kv(key: str, value: Any) -> None:
+    print(f"{key:<24} {value}")
+
+
+def one(cur: sqlite3.Cursor, sql: str, params: Iterable[Any] = ()) -> Any:
+    row = cur.execute(sql, tuple(params)).fetchone()
+    return None if row is None else row[0]
+
+
+def nonempty_sql(col: str) -> str:
+    return f"TRIM(COALESCE({col},'')) != ''"
+
+
 def table_exists(cur: sqlite3.Cursor, table: str) -> bool:
-    return (
-        one(
-            cur,
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-            (table,),
-        )
-        is not None
-    )
+    return one(cur, "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)) is not None
 
 
 def get_columns(cur: sqlite3.Cursor, table: str) -> set[str]:
@@ -47,11 +56,6 @@ def pct(part: int, total: int) -> str:
     return f"{(part * 100.0 / total):.1f}%"
 
 
-def print_section(title: str) -> None:
-    print("\n" + title)
-    print("-" * len(title))
-
-
 def print_table_counts(cur: sqlite3.Cursor) -> None:
     print_section("TABLES")
     rows = cur.execute(
@@ -59,7 +63,7 @@ def print_table_counts(cur: sqlite3.Cursor) -> None:
     ).fetchall()
     for (name,) in rows:
         if name == "leads":
-            continue  # Kommentar: användaren vill inte se leads
+            continue  # Kommentar: du vill inte se leads här
         print_kv(name, f"{count_rows(cur, name):,} rows")
 
 
@@ -69,8 +73,7 @@ def print_companies_core(cur: sqlite3.Cursor, total: int, cols: set[str]) -> Non
     def nonempty_count(col: str) -> int:
         return int(one(cur, f"SELECT COUNT(*) FROM companies WHERE {nonempty_sql(col)}") or 0)
 
-    key_cols = ["website", "emails", "employees", "sni_codes", "city"]
-    for c in key_cols:
+    for c in ["website", "emails", "employees", "sni_codes", "city"]:
         if c not in cols:
             continue
         n = nonempty_count(c)
@@ -96,7 +99,6 @@ def print_status_counts(cur: sqlite3.Cursor, cols: set[str], col: str) -> None:
 
 def print_tech_signals(cur: sqlite3.Cursor, cols: set[str]) -> None:
     print_section("TECH / IT SIGNALS")
-    # Kommentar: medvetet INTE tech_err_reason (användaren vill inte se det)
     for c in [
         "microsoft_status",
         "microsoft_strength",
@@ -112,7 +114,6 @@ def print_freshness(cur: sqlite3.Cursor, cols: set[str], total: int) -> None:
         return
 
     print_section("DATA FRESHNESS (tech_checked_at)")
-    # Kommentar: SQLite ISO-strängar fungerar bra med datetime('now', ...)
     last_24h = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at >= datetime('now','-1 day')") or 0)
     last_7d = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at >= datetime('now','-7 day')") or 0)
     last_30d = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at >= datetime('now','-30 day')") or 0)
@@ -146,12 +147,17 @@ def print_top_cities(cur: sqlite3.Cursor, cols: set[str]) -> None:
 
 
 def main() -> None:
-    con = connect(DEFAULT_DB_PATH)
+    if not DB_PATH.exists():
+        raise FileNotFoundError(f"DB saknas: {DB_PATH}")
+
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+
     try:
         cur = con.cursor()
 
         print("DATABASE OVERVIEW")
-        print_kv("Database", str(DEFAULT_DB_PATH))
+        print_kv("Database", str(DB_PATH))
         print_kv("Generated", utc_now_str())
 
         print_table_counts(cur)
@@ -168,7 +174,6 @@ def main() -> None:
 
         print_companies_core(cur, total, cols)
 
-        # Kommentar: statusfält som brukar vara nyttiga (utan leads + utan tech_err_reason)
         for c in ["website_status", "email_status", "hiring_status"]:
             print_status_counts(cur, cols, c)
 
@@ -177,7 +182,6 @@ def main() -> None:
         print_top_cities(cur, cols)
 
         print("\nSUMMARY")
-        # Kommentar: håll summary kort och “faktabaserad”
         if "website" in cols:
             w = int(one(cur, f"SELECT COUNT(*) FROM companies WHERE {nonempty_sql('website')}") or 0)
             print_kv("website coverage", f"{pct(w, total)}")

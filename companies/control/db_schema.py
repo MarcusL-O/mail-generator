@@ -2,14 +2,37 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import List
+from pathlib import Path
+from typing import Any, Iterable, List
 
-from .db_connection_path import DEFAULT_DB_PATH, connect, print_kv
+# =========================
+# KONFIG (samma stil som db_overview.py)
+# =========================
+DB_PATH = Path("data/db/companies.db.sqlite")
+ALT_DB_PATH = Path("data/companies.db.sqlite")  # Kommentar: fallback om du kör utan /db
+# =========================
+
+
+def resolve_db_path() -> Path:
+    if DB_PATH.exists():
+        return DB_PATH
+    if ALT_DB_PATH.exists():
+        return ALT_DB_PATH
+    raise FileNotFoundError(f"DB saknas: {DB_PATH} (och fallback: {ALT_DB_PATH})")
+
+
+def print_kv(key: str, value: Any) -> None:
+    print(f"{key:<24} {value}")
 
 
 def print_section(title: str) -> None:
     print("\n" + title)
     print("-" * len(title))
+
+
+def one(cur: sqlite3.Cursor, sql: str, params: Iterable[Any] = ()) -> Any:
+    row = cur.execute(sql, tuple(params)).fetchone()
+    return None if row is None else row[0]
 
 
 def get_tables(cur: sqlite3.Cursor) -> List[str]:
@@ -34,7 +57,6 @@ def print_table_schema(cur: sqlite3.Cursor, table: str) -> None:
         return
 
     for r in rows:
-        col_id = r[0]
         name = r[1]
         col_type = r[2] or "(no type)"
         not_null = "NOT NULL" if r[3] else ""
@@ -46,12 +68,14 @@ def print_table_schema(cur: sqlite3.Cursor, table: str) -> None:
 
 
 def main() -> None:
-    con = connect(DEFAULT_DB_PATH)
+    db_path = resolve_db_path()
+
+    con = sqlite3.connect(db_path)
     try:
         cur = con.cursor()
 
         print("DATABASE SCHEMA")
-        print_kv("Database", str(DEFAULT_DB_PATH))
+        print_kv("Database", str(db_path))
 
         tables = get_tables(cur)
         if not tables:
