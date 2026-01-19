@@ -1,12 +1,13 @@
-#Skapar grundinställningar (default template, delays, from-name).
-#Central konfig i DB.
-#Skapar tabellen settings i outreach.db om den inte finns
-#Lägger in globala outreach-inställningar (from-email, limits, delays, dry-run m.m.)
-#Kör upsert → samma script kan köras flera gånger utan dubletter
-#Läser värden från env om de finns, annars använder defaults
-#Sparar inga hemligheter (lösenord ska ligga i .env, inte DB)
-#Resultat:
-#send-scripten har en gemensam plats att läsa regler från innan mejl skickas.
+# seed/seed_settings.py
+# Skapar grundinställningar (default template, delays, from-name).
+# Central konfig i DB.
+# Skapar tabellen settings i outreach.db om den inte finns
+# Lägger in globala outreach-inställningar (from-email, limits, delays, dry-run m.m.)
+# Kör upsert → samma script kan köras flera gånger utan dubletter
+# Läser värden från env om de finns, annars använder defaults
+# Sparar inga hemligheter (lösenord ska ligga i .env, inte DB)
+# Resultat:
+# send-scripten har en gemensam plats att läsa regler från innan mejl skickas.
 
 import os
 import sqlite3
@@ -72,10 +73,20 @@ def seed():
         "max_delay_between_steps_hours": os.getenv("OUTREACH_MAX_DELAY_BETWEEN_STEPS_HOURS", "72"),
 
         # Driftläge
-        "dry_run": os.getenv("OUTREACH_DRY_RUN", "1"),  # 1 = logga men skicka inte (bra tills SMTP är klart)
+        "dry_run": os.getenv("OUTREACH_DRY_RUN", "1"),  # 1 = logga men skicka inte
 
         # Tidzon (för schemaläggning)
         "timezone": os.getenv("OUTREACH_TIMEZONE", "Europe/Stockholm"),
+
+        # Prioritering (nytt, säkra defaults)
+        # Kommentar (svenska): 1 = sortera så tier 1 går före, NULL/utan tier hamnar sist
+        "prioritize_tier": os.getenv("OUTREACH_PRIORITIZE_TIER", "1"),
+        # Kommentar (svenska): 1 = inom samma tier, välj högst score först
+        "prioritize_score": os.getenv("OUTREACH_PRIORITIZE_SCORE", "1"),
+
+        # Batch (valfritt men ofta praktiskt i send)
+        # Kommentar (svenska): hur många "due" lead_campaigns send får plocka per körning
+        "max_due_batch": os.getenv("OUTREACH_MAX_DUE_BATCH", "500"),
     }
 
     for k, v in defaults.items():
