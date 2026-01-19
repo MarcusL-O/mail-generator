@@ -24,7 +24,7 @@ SHARD_TOTAL = args.shard_total
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/companies.db.sqlite")
+DB_PATH = Path("data/db/companies.db.sqlite")
 
 OUT_PATH = Path(f"data/out/websites_guess_shard{SHARD_ID}.ndjson")
 LIMIT = 0  # 0 = ALLA

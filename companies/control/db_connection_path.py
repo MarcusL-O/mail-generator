@@ -8,7 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-DEFAULT_DB_PATH = Path("data/companies.db.sqlite")
+DEFAULT_DB_PATH = Path("data/db/companies.db.sqlite")
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:

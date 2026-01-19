@@ -1,3 +1,6 @@
+# klar fungerar, bra data 19/01
+
+
 import re
 import time
 import json
@@ -24,7 +27,7 @@ SHARD_TOTAL = args.shard_total
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/companies.db.sqlite")
+DB_PATH = Path("data/db/companies.db.sqlite")
 OUT_PATH = Path(f"data/out/site_review_shard{SHARD_ID}.ndjson")
 LIMIT = 0              # 0 = ALLA
 RESUME = True
@@ -110,7 +113,7 @@ def _safe_url(url: str) -> bool:
         return False
 
 def _is_retryable_status(code: int) -> bool:
-    # Kommentar: vi retryar INTE 403/429, bara timeout
+    # Kommentar: vi retryar INTE 403/429, bara timeout (men vi vill kunna särskilja dessa koder)
     return code in (403, 429, 500, 502, 503, 504)
 
 def _is_dns_miss_error(e: Exception) -> bool:
@@ -211,7 +214,6 @@ def compute_score(url: str, html: str) -> tuple[int, list[str]]:
     html_lower = html.lower()
 
     points = 0
-    max_points = 10
 
     # 1) HTTPS
     if url.startswith("https://"):
@@ -282,7 +284,6 @@ def compute_score(url: str, html: str) -> tuple[int, list[str]]:
 
     # Clamp till 1–10
     score = max(1, min(10, points))
-
     return score, flags
 
 def load_done_set(path: Path) -> set[str]:
@@ -346,6 +347,13 @@ def normalize_url(u: str) -> str:
         u = "https://" + u
     return u
 
+def _format_score_counts(score_counts: dict[int, int]) -> str:
+    # Kommentar: alltid 1..10 i output
+    parts = []
+    for s in range(1, 11):
+        parts.append(f"{s}={score_counts.get(s, 0)}")
+    return " ".join(parts)
+
 def main():
     if not DB_PATH.exists():
         raise FileNotFoundError(f"DB saknas: {DB_PATH}")
@@ -369,6 +377,9 @@ def main():
     processed = ok = skipped_not_html = 0
     err_403 = err_429 = err_timeout = err_other = 0
 
+    # Kommentar: score-fördelning (bara för OK-rader)
+    score_counts: dict[int, int] = {s: 0 for s in range(1, 11)}
+
     start = time.time()
 
     try:
@@ -384,6 +395,12 @@ def main():
                 # Kommentar: timeout = temporärt => skriv INTE rad (så den kan köras om)
                 if err == "timeout":
                     err_timeout += 1
+                    if processed % PRINT_EVERY == 0:
+                        rate = processed / max(1e-9, time.time() - start)
+                        print(
+                            f"[{processed}] ok={ok} 403={err_403} 429={err_429} timeout={err_timeout} other={err_other} | {rate:.1f}/s\n"
+                            f"Scores: {_format_score_counts(score_counts)}"
+                        )
                     continue
 
                 row = {
@@ -402,7 +419,6 @@ def main():
                     else:
                         err_429 += 1
                     row["err_reason"] = err
-                    # Kommentar: block => markera och gå vidare, ingen score
                     out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
                 elif err:
@@ -420,12 +436,14 @@ def main():
                     row["site_flags"] = flags
                     out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     ok += 1
+                    score_counts[score] = score_counts.get(score, 0) + 1
 
                 if processed % PRINT_EVERY == 0:
                     rate = processed / max(1e-9, time.time() - start)
                     print(
                         f"[{processed}] ok={ok} not_html={skipped_not_html} "
-                        f"403={err_403} 429={err_429} timeout={err_timeout} other={err_other} | {rate:.1f}/s"
+                        f"403={err_403} 429={err_429} timeout={err_timeout} other={err_other} | {rate:.1f}/s\n"
+                        f"Scores: {_format_score_counts(score_counts)}"
                     )
 
     except KeyboardInterrupt:
@@ -436,6 +454,7 @@ def main():
     print("KLART ✅")
     print(f"Processade: {processed} | OK: {ok} | not_html: {skipped_not_html}")
     print(f"Errors: 403={err_403} 429={err_429} timeout={err_timeout} other={err_other}")
+    print(f"Scores: {_format_score_counts(score_counts)}")
     print(f"OUT: {OUT_PATH.resolve()}")
 
 if __name__ == "__main__":

@@ -1,4 +1,19 @@
 # hiring_review_shards.py
+# Spikat: 100% safe YES (endast egna career-paths), extern länk => maybe_external (följs ej)
+# 2026-01-19
+#kan vara att denna ger falska negatives. kolla om vi kan uppgradera det i framtiden men ändå ha kvar säkerheten på yes
+# den matar inte in vilken anstälning dem söker in i db, typ utveckalre, it_devops eller så
+
+#detta nedan måste fixas igen, funakr alltså inte alls helt 100 nu.. 
+
+#varför gav scriptet 8?
+#Den räknar “jobblänkar” via URL-mönster (t.ex. /careers/…) och på DFDS-sidan finns flera navigationslänkar som matchar mönstret (typ “Current vacancies”, “Office careers”, osv) → de blir felaktigt “annonser”.
+#Fix (utan kod här):
+#Räkna inte länkar som bara är karriär-navigering.
+#Räkna bara länkar som ser ut som faktiska annonser, eller gå vidare till “Current vacancies”-sidan och räkna där.
+#Och angående kategorier:
+#Nej, det här hiring-scriptet lägger inte in kategorier just nu. Du behöver ett separat match-script (NDJSON → kategori via job_categories), eller bygga in matchningen i hiring-scriptet (men då blir det mer logik i shard).
+
 import re
 import time
 import json
@@ -25,7 +40,7 @@ SHARD_TOTAL = args.shard_total
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/companies.db.sqlite")
+DB_PATH = Path("data/db/companies.db.sqlite")
 OUT_PATH = Path(f"data/out/hiring_review_shard{SHARD_ID}.ndjson")
 LIMIT = 0              # 0 = ALLA
 RESUME = True
@@ -36,31 +51,31 @@ REFRESH_DAYS = 30      # Kommentar: rerun efter 30 dagar
 TIMEOUT_SECONDS = 12
 SLEEP_BETWEEN_REQUESTS = 0.15
 MAX_BYTES = 650_000    # Kommentar: vi läser max ~650KB HTML per sida
-MAX_PAGES = 7          # Kommentar: liten crawl-budget
+MAX_PAGES = 7          # Kommentar: liten crawl-budget (max career-sidor per bolag)
 
 session = requests.Session()
 session.headers.update({
     "User-Agent": f"Mozilla/5.0 (Didup-HiringReview/1.0; shard={SHARD_ID})"
 })
 
-# Kommentar: vi kollar bara egen domän (ingen Indeed/Jobbsafari/ATS-externt)
+# Kommentar: vi letar bara karriär-sidor på egen domän för YES
 CAREER_PATH_HINTS = [
     "/karriar", "/karriar/", "/karriar/lediga-jobb", "/jobb", "/jobb/", "/lediga-jobb", "/lediga-jobb/",
     "/career", "/careers", "/careers/", "/jobs", "/jobs/", "/job", "/job/",
     "/work-with-us", "/work-with-us/", "/join", "/join/", "/join-us", "/join-us/",
-    "/om-oss/karriar", "/om-oss/karriar/", "/about/careers", "/about/careers/"
+    "/om-oss/karriar", "/om-oss/karriar/", "/about/careers", "/about/careers/",
 ]
 
-# Kommentar: “soft” nyckelord (används för att hitta relevanta sidor, men inte för YES längre)
+# Kommentar: soft keywords (relevansfilter)
 HIRING_KEYWORDS = [
     "vi söker", "vi soeker", "vi anställer", "vi anstaller", "vi rekryterar",
     "lediga jobb", "ledig tjänst", "ledig tjanst", "karriär", "karriar",
     "ansök", "ansok", "rekrytering",
     "we are hiring", "we're hiring", "join our team", "open positions", "open roles",
-    "careers", "career", "jobs", "job openings", "apply now"
+    "careers", "career", "jobs", "job openings", "apply now",
 ]
 
-# Kommentar: triggers där vi försöker fånga rolltext efter frasen
+# Kommentar: triggers för rolltext (vi vill fånga rollnamn efter frasen)
 ROLE_TRIGGERS = [
     r"\bvi\s+söker\s+",
     r"\bvi\s+soeker\s+",
@@ -71,17 +86,39 @@ ROLE_TRIGGERS = [
     r"\bwe\s+are\s+looking\s+for\s+",
 ]
 
-# Kommentar: ord som ofta är “inte en rolltitel”
+# Kommentar: externa jobbkällor (indikator => maybe_external, vi följer INTE)
+EXTERNAL_JOB_DOMAINS = [
+    "linkedin.com",
+    "indeed.com",
+    "glassdoor.com",
+    "arbetsformedlingen.se",
+    "monster.com",
+    "stepstone.",
+    # ATS
+    "teamtailor.com",
+    "jobylon.com",
+    "varbi.com",
+    "reachmee.com",
+    "recman.no",
+    "greenhouse.io",
+    "lever.co",
+    "workday.com",
+    "smartrecruiters.com",
+    "recruitee.com",
+]
+
 GENERIC_NOT_ROLES = {
     "karriär", "karriar", "career", "careers", "jobb", "jobs", "job", "job openings",
     "open positions", "open roles", "join us", "join our team", "about", "om oss",
-    "kontakt", "contact", "ansök", "ansok", "apply", "apply now"
+    "kontakt", "contact", "ansök", "ansok", "apply", "apply now",
 }
 
 EMAIL_RE = re.compile(r"[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}", re.I)
 
+
 def utcnow_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
 
 def parse_iso(s: Optional[str]) -> Optional[datetime]:
     if not s:
@@ -91,6 +128,7 @@ def parse_iso(s: Optional[str]) -> Optional[datetime]:
     except Exception:
         return None
 
+
 def needs_refresh(checked_at: Optional[str]) -> bool:
     dt = parse_iso(checked_at)
     if not dt:
@@ -98,9 +136,11 @@ def needs_refresh(checked_at: Optional[str]) -> bool:
     cutoff = datetime.now(timezone.utc) - timedelta(days=REFRESH_DAYS)
     return dt < cutoff
 
+
 def in_shard(orgnr: str) -> bool:
     h = hashlib.md5(orgnr.encode("utf-8")).hexdigest()
     return (int(h, 16) % SHARD_TOTAL) == SHARD_ID
+
 
 def _valid_hostname(host: str) -> bool:
     if not host:
@@ -124,6 +164,7 @@ def _valid_hostname(host: str) -> bool:
             return False
     return True
 
+
 def _safe_url(url: str) -> bool:
     try:
         u = url.strip()
@@ -135,9 +176,11 @@ def _safe_url(url: str) -> bool:
     except Exception:
         return False
 
+
 def _is_retryable_status(code: int) -> bool:
     # Kommentar: vi retryar INTE 403/429, bara timeout (timeout => ingen rad)
     return code in (403, 429, 500, 502, 503, 504)
+
 
 def _is_dns_miss_error(e: Exception) -> bool:
     msg = str(e).lower()
@@ -148,6 +191,7 @@ def _is_dns_miss_error(e: Exception) -> bool:
         or "temporary failure in name resolution" in msg
         or "getaddrinfo failed" in msg
     )
+
 
 def fetch_html(url: str) -> tuple[Optional[str], str]:
     """
@@ -205,6 +249,7 @@ def fetch_html(url: str) -> tuple[Optional[str], str]:
     except Exception:
         return (None, "other")
 
+
 def normalize_url(u: str) -> str:
     u = (u or "").strip()
     if not u:
@@ -213,8 +258,9 @@ def normalize_url(u: str) -> str:
         u = "https://" + u
     return u
 
+
 def strip_text(html: str) -> str:
-    # Kommentar: snabb text-extraktion
+    # Kommentar: snabb text-extraktion (räcker för relevans + triggers)
     s = html.lower()
     s = re.sub(r"<script[\s\S]*?</script>", " ", s)
     s = re.sub(r"<style[\s\S]*?</style>", " ", s)
@@ -223,19 +269,11 @@ def strip_text(html: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-def extract_headings(html: str) -> list[str]:
-    # Kommentar: plocka rubriker (ofta jobbtitlar) ur h1-h4
-    html_lower = html.lower()
-    hs = re.findall(r"<h[1-4][^>]*>([\s\S]{0,200}?)</h[1-4]>", html_lower)
-    out: list[str] = []
-    for raw in hs[:400]:
-        t = re.sub(r"<[^>]+>", " ", raw)
-        t = re.sub(r"\s+", " ", t).strip()
-        if not t:
-            continue
-        if 3 <= len(t) <= 80:
-            out.append(t)
-    return out
+
+def is_relevant_page(text: str) -> bool:
+    hits = sum(1 for w in HIRING_KEYWORDS if w in text)
+    return hits >= 1
+
 
 def looks_like_role(title: str) -> bool:
     t = (title or "").strip().lower()
@@ -247,15 +285,12 @@ def looks_like_role(title: str) -> bool:
         return False
     if EMAIL_RE.search(t):
         return False
-    # Kommentar: minst 2 bokstäver, inte bara siffror
     if not re.search(r"[a-zåäö]", t):
         return False
     if re.fullmatch(r"[\d\W_]+", t):
         return False
-    # Kommentar: undvik superkorta generiska rubriker
-    if len(t) < 6 and t in {"jobb", "jobs", "career", "karriar"}:
-        return False
     return True
+
 
 def extract_roles_from_triggers(text: str) -> list[str]:
     roles: list[str] = []
@@ -265,10 +300,15 @@ def extract_roles_from_triggers(text: str) -> list[str]:
             cand = re.split(r"[\.!\?\|\;\:\(\)\[\]\{\\\/]", cand)[0].strip()
             cand = re.sub(r"\s+", " ", cand).strip()
             # Kommentar: rensa vanliga fyllnadsord
-            cand = re.sub(r"\b(nu|idag|hos oss|till vårt team|till vart team|just nu|omgående|immediately)\b", "", cand).strip()
+            cand = re.sub(
+                r"\b(nu|idag|hos oss|till vårt team|till vart team|just nu|omgående|immediately)\b",
+                "",
+                cand,
+            ).strip()
             cand = re.sub(r"\s+", " ", cand).strip()
             if 3 <= len(cand) <= 60 and looks_like_role(cand):
                 roles.append(cand)
+
     # dedupe
     seen = set()
     uniq = []
@@ -280,63 +320,90 @@ def extract_roles_from_triggers(text: str) -> list[str]:
         uniq.append(r)
     return uniq
 
-def count_jobcards_and_apply(html: str, role_candidates: list[str]) -> tuple[int, bool]:
+
+def count_job_post_links(base_url: str, html: str) -> int:
     """
-    jobcards_count: antal distinkta rubriker som ser ut som roller
-    apply_with_role: om apply/ansök förekommer nära roll-rubrik eller rolltext
+    Kommentar: räkna faktiska “annonser” som interna länkar som ser ut som jobbposter.
+    Vi undviker spontanansökan och fluff.
     """
     html_lower = html.lower()
+    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_lower)
 
-    # Kommentar: jobcards = rubriker som ser ut som roller
-    headings = extract_headings(html_lower)
-    role_headings = [h for h in headings if looks_like_role(h)]
-    # dedupe rubriker
+    base_host = (urlsplit(base_url).hostname or "").lower()
     seen = set()
-    role_headings_uniq = []
-    for h in role_headings:
-        k = h.strip().lower()
-        if k in seen:
+    cnt = 0
+
+    for h in hrefs[:6000]:
+        if not h:
             continue
-        seen.add(k)
-        role_headings_uniq.append(h)
-
-    jobcards_count = len(role_headings_uniq)
-
-    # Kommentar: apply/ansök kopplad till roll = “apply/ansök” inom närhet av rubrik/rolltext
-    apply_words = ["ansök", "ansok", "apply", "apply now", "sök tjänsten", "soek tjansten"]
-    apply_with_role = False
-
-    # 1) nära rubriker (snabbt)
-    for h in role_headings_uniq[:40]:
-        idx = html_lower.find(h)
-        if idx == -1:
+        h = h.strip()
+        if h.startswith("#") or h.startswith("mailto:") or h.startswith("tel:"):
             continue
-        window = html_lower[idx: idx + 800]  # Kommentar: “samma block-ish”
-        if any(w in window for w in apply_words):
-            apply_with_role = True
-            break
 
-    # 2) fallback: nära trigger-extraherade roller
-    if not apply_with_role:
-        for r in role_candidates[:40]:
-            rr = r.lower()
-            idx = html_lower.find(rr)
-            if idx == -1:
-                continue
-            window = html_lower[idx: idx + 700]
-            if any(w in window for w in apply_words):
-                apply_with_role = True
-                break
+        absu = urljoin(base_url, h)
+        parts = urlsplit(absu)
+        host = (parts.hostname or "").lower()
+        if host != base_host:
+            continue
 
-    return jobcards_count, apply_with_role
+        path = (parts.path or "").lower()
+        q = (parts.query or "").lower()
 
-def is_relevant_page(text: str) -> bool:
-    # Kommentar: för att prioritera sidor som verkar vara karriär/jobb
-    hits = sum(1 for w in HIRING_KEYWORDS if w in text)
-    return hits >= 1
+        # Kommentar: filtrera bort “spontanansökan”
+        if "spontan" in path or "spontan" in q:
+            continue
+
+        # Kommentar: typiska annonslänkar (interna)
+        is_job_post = (
+            "/jobb/" in path
+            or "/jobs/" in path
+            or "/lediga-jobb/" in path
+            or "/career/" in path
+            or "/careers/" in path
+            or "job=" in q
+            or "position" in q
+            or "vacancy" in q
+        )
+
+        if not is_job_post:
+            continue
+
+        if absu in seen:
+            continue
+        seen.add(absu)
+        cnt += 1
+
+    return cnt
+
+
+def hard_hiring_decision_strict(page_url: str, html: str) -> tuple[bool, str, int]:
+    """
+    STRICT (100% safe):
+      YES om:
+        - vi hittar rolltext via triggers (vi söker X / we're hiring X)
+        ELLER
+        - vi hittar minst 1 intern annonslänk (job post link)
+      annars NO
+
+    hiring_count:
+      - om triggers hittas => antal roller (len(roles))
+      - annars => antal annonslänkar (joblinks)
+    """
+    text = strip_text(html)
+    roles = extract_roles_from_triggers(text)
+    if roles:
+        what = "; ".join(roles[:12])[:500]
+        return True, what, len(roles)
+
+    joblinks = count_job_post_links(page_url, html)
+    if joblinks >= 1:
+        return True, "", int(joblinks)
+
+    return False, "", 0
+
 
 def extract_internal_career_links(base_url: str, html: str) -> list[str]:
-    # Kommentar: enkel href-extraktion, men bara interna + karriär-liknande paths
+    # Kommentar: plocka interna länkar som matchar CAREER_PATH_HINTS
     html_lower = html.lower()
     hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_lower)
     out: list[str] = []
@@ -368,7 +435,8 @@ def extract_internal_career_links(base_url: str, html: str) -> list[str]:
     seen = set()
     uniq = []
     for u in out:
-        if u in seen:
+        u = u.strip()
+        if not u or u in seen:
             continue
         seen.add(u)
         uniq.append(u)
@@ -376,34 +444,42 @@ def extract_internal_career_links(base_url: str, html: str) -> list[str]:
             break
     return uniq
 
-def hard_hiring_decision(html: str) -> tuple[bool, str, int, list[str]]:
-    """
-    HÅRD REGEL:
-      YES om minst en av:
-        - vi hittar en rolltitel (trigger-extraherad eller rubrik som ser ut som roll)
-        - vi hittar apply/ansök-indikator kopplad till roll
-        - vi hittar minst 2 distinkta jobbcards/rubriker
-      annars NO
-    """
-    text = strip_text(html)
 
-    roles_from_triggers = extract_roles_from_triggers(text)
-    jobcards_count, apply_with_role = count_jobcards_and_apply(html, roles_from_triggers)
+def find_external_job_links(base_url: str, html: str) -> list[str]:
+    # Kommentar: vi följer inte, bara loggar indikator
+    html_lower = html.lower()
+    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_lower)
 
-    # Kommentar: “rolltitel hittad” = trigger-roll ELLER minst 1 roll-rubrik
-    # Vi räknar rubrik-roller via jobcards_count > 0
-    role_title_found = (len(roles_from_triggers) >= 1) or (jobcards_count >= 1)
+    out: list[str] = []
+    for h in hrefs[:5000]:
+        if not h:
+            continue
+        h = h.strip()
+        if h.startswith("#") or h.startswith("mailto:") or h.startswith("tel:"):
+            continue
 
-    yes = role_title_found or apply_with_role or (jobcards_count >= 2)
+        absu = urljoin(base_url, h)
+        parts = urlsplit(absu)
+        host = (parts.hostname or "").lower()
+        if not host:
+            continue
 
-    if yes:
-        # Kommentar: count = jobcards om vi har flera, annars 1
-        count = jobcards_count if jobcards_count >= 1 else 1
-        # Kommentar: vad = trigger-extraherade roller (om tomt, lämna tomt)
-        what = "; ".join(roles_from_triggers[:12])[:500]
-        return True, what, int(count), roles_from_triggers[:12]
+        if any(dom in host for dom in EXTERNAL_JOB_DOMAINS):
+            out.append(absu)
 
-    return False, "", 0, roles_from_triggers[:12]
+    # dedupe + begränsa
+    seen = set()
+    uniq = []
+    for u in out:
+        u = u.strip()
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        uniq.append(u)
+        if len(uniq) >= 5:
+            break
+    return uniq
+
 
 def load_done_set(path: Path) -> set[str]:
     done = set()
@@ -422,6 +498,7 @@ def load_done_set(path: Path) -> set[str]:
             except Exception:
                 pass
     return done
+
 
 def pick_targets(conn: sqlite3.Connection, limit: Optional[int]) -> list[tuple[str, str, str, Optional[str]]]:
     cur = conn.cursor()
@@ -458,6 +535,7 @@ def pick_targets(conn: sqlite3.Connection, limit: Optional[int]) -> list[tuple[s
                 break
     return out
 
+
 def main():
     if not DB_PATH.exists():
         raise FileNotFoundError(f"DB saknas: {DB_PATH}")
@@ -481,6 +559,11 @@ def main():
     processed = ok = skipped_not_html = 0
     err_403 = err_429 = err_timeout = err_other = 0
 
+    yes_count = 0
+    no_count = 0
+    unknown_count = 0
+    maybe_external_count = 0
+
     start = time.time()
 
     try:
@@ -489,10 +572,8 @@ def main():
                 processed += 1
                 base_url = normalize_url(website)
 
-                # Kommentar: timeout-hantering per orgnr
                 timeout_flag = False
 
-                # 1) Hämta startsidan
                 html, err = fetch_html(base_url)
                 time.sleep(SLEEP_BETWEEN_REQUESTS)
 
@@ -507,15 +588,17 @@ def main():
                     "website": base_url,
                     "checked_at": utcnow_iso(),
                     "err_reason": "",
-                    "hiring_status": "unknown",
+                    "hiring_status": "unknown",          # yes | no | unknown | maybe_external
                     "hiring_what_text": "",
                     "hiring_count": None,
                     "evidence_url": "",
+                    "external_job_urls": [],
                 }
 
                 # 403/429/other/not_html på startsidan => unknown + skriv rad
                 if err in ("403", "429"):
                     row["err_reason"] = err
+                    unknown_count += 1
                     if err == "403":
                         err_403 += 1
                     else:
@@ -524,6 +607,7 @@ def main():
                     continue
 
                 if err:
+                    unknown_count += 1
                     if err == "not_html":
                         skipped_not_html += 1
                         row["err_reason"] = "not_html"
@@ -533,34 +617,31 @@ def main():
                     out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     continue
 
-                # 2) Best effort: utvärdera startsida + relevanta karriärsidor
-                best_yes = False
-                best_what = ""
-                best_count = 0
-                best_evidence = ""
+                # Kommentar: externa jobblänkar från startsidan (indikator)
+                ext_urls = find_external_job_links(base_url, html or "")
+                if ext_urls:
+                    row["external_job_urls"] = ext_urls
 
-                # Kommentar: vi utvärderar startsidan först
-                yes0, what0, count0, _roles0 = hard_hiring_decision(html or "")
-                if yes0:
-                    best_yes = True
-                    best_what = what0
-                    best_count = count0
-                    best_evidence = base_url
-
-                # Kommentar: bygg kö med karriär-URL:er
-                visited = set([base_url])
+                # Kommentar: STRICT: vi tar INTE beslut på startsidan.
+                # Startsidan används bara för att hitta karriär-länkar.
+                visited = {base_url}
                 queue: list[str] = []
 
-                # Kommentar: prova vanliga paths direkt
+                # Kommentar: prova vanliga career paths direkt
                 for p in CAREER_PATH_HINTS:
                     u = urljoin(base_url.rstrip("/") + "/", p.lstrip("/"))
                     if u not in visited:
                         queue.append(u)
 
-                # Kommentar: och länkar från startsidan (endast interna)
+                # Kommentar: och interna länkar som matchar career-paths
                 queue.extend(extract_internal_career_links(base_url, html or ""))
 
-                pages_used = 1
+                best_yes = False
+                best_what = ""
+                best_count = 0
+                best_evidence = ""
+
+                pages_used = 0
                 while queue and pages_used < MAX_PAGES:
                     u = queue.pop(0)
                     if u in visited:
@@ -574,7 +655,7 @@ def main():
                         timeout_flag = True
                         break
 
-                    # Kommentar: mur => vi skriver INTE err här (startsidan var OK), bara skippar denna URL
+                    # Kommentar: mur => skip
                     if e2 in ("403", "429"):
                         pages_used += 1
                         continue
@@ -585,16 +666,15 @@ def main():
 
                     pages_used += 1
 
-                    # Kommentar: vi skippar irrelevanta sidor snabbt
-                    if not is_relevant_page(strip_text(h2)):
+                    t2 = strip_text(h2)
+                    if not is_relevant_page(t2):
                         continue
 
-                    y, w, c, _roles = hard_hiring_decision(h2)
+                    y, w, c = hard_hiring_decision_strict(u, h2)
                     if y:
-                        # Kommentar: första YES vinner (vi vill ha snabb, strikt signal)
                         best_yes = True
                         best_what = w
-                        best_count = c
+                        best_count = c if c >= 1 else 1
                         best_evidence = u
                         break
 
@@ -603,19 +683,26 @@ def main():
                     err_timeout += 1
                     continue
 
-                # 3) Sätt output enligt hårda regler
+                # Kommentar: slutbeslut
                 if best_yes:
                     row["hiring_status"] = "yes"
-                    row["hiring_count"] = int(best_count) if best_count >= 1 else 1
+                    row["hiring_count"] = int(best_count)
                     row["hiring_what_text"] = best_what
                     row["evidence_url"] = best_evidence
                     row["err_reason"] = ""
+                    yes_count += 1
                 else:
-                    row["hiring_status"] = "no"
-                    row["hiring_count"] = 0
-                    row["hiring_what_text"] = ""
-                    row["evidence_url"] = ""
-                    row["err_reason"] = ""
+                    # Kommentar: ingen intern jobbsida hittad => no eller maybe_external
+                    if row["external_job_urls"]:
+                        row["hiring_status"] = "maybe_external"
+                        row["hiring_count"] = None
+                        row["evidence_url"] = row["external_job_urls"][0]
+                        maybe_external_count += 1
+                    else:
+                        row["hiring_status"] = "no"
+                        row["hiring_count"] = 0
+                        row["evidence_url"] = ""
+                        no_count += 1
 
                 out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
                 ok += 1
@@ -623,7 +710,8 @@ def main():
                 if processed % PRINT_EVERY == 0:
                     rate = processed / max(1e-9, time.time() - start)
                     print(
-                        f"[{processed}] ok={ok} not_html={skipped_not_html} "
+                        f"[{processed}] ok={ok} yes={yes_count} no={no_count} maybe_external={maybe_external_count} "
+                        f"unknown={unknown_count} not_html={skipped_not_html} "
                         f"403={err_403} 429={err_429} timeout={err_timeout} other={err_other} | {rate:.1f}/s"
                     )
 
@@ -633,9 +721,13 @@ def main():
         conn.close()
 
     print("KLART ✅")
-    print(f"Processade: {processed} | OK: {ok} | not_html: {skipped_not_html}")
+    print(
+        f"Processade: {processed} | OK: {ok} | yes={yes_count} | no={no_count} | maybe_external={maybe_external_count} "
+        f"| unknown={unknown_count} | not_html={skipped_not_html}"
+    )
     print(f"Errors: 403={err_403} 429={err_429} timeout={err_timeout} other={err_other}")
     print(f"OUT: {OUT_PATH.resolve()}")
+
 
 if __name__ == "__main__":
     main()

@@ -44,10 +44,21 @@ Bolagsverket
 Förbättra targeting per uppdrag/leverantör
 Inför poängsystem (konfigurerbart, ej hårt krav) --- nej, jag lägger alla triggers/filtrering jag har i targeting, väljer om jag vill ha dem eller inte med i denna targetingen för mailutskikc x till företag x. poängsystem behövs inte. 
 
-Implementera stopp-logik (stopped_reason som central sanning)
+
+
+
+
+
+
+
+
+
+tror klar syucket nedan
+
+Implementera stopp-logik (stopped_reason som central sanning)--klar
 Implementera bounce-hantering (hard/soft → stoppa direkt)
-Implementera complaint-hantering (spam → do_not_contact + stoppa kampanj)
-Implementera unsubscribe (länk → do_not_contact, ingen UI)
+Implementera complaint-hantering (spam → do_not_contact + stoppa kampanj) --nej
+Implementera unsubscribe (länk → do_not_contact, ingen UI) -- nej
 Implementera sändhastighet (global + per kampanj)
 Implementera warmup-logik (lågt → upptrappning)
 Testa allt via dry-run + simuleringar

@@ -1,4 +1,6 @@
 # tech_footprint_shards.py
+
+#klar 01-19, ger bra data 70-80% sanning tror jag (oklart svar från ai)
 import re
 import time
 import json
@@ -27,7 +29,7 @@ SHARD_TOTAL = args.shard_total
 # =========================
 # ÄNDRA HÄR
 # =========================
-DB_PATH = Path("data/companies.db.sqlite")
+DB_PATH = Path("data/db/companies.db.sqlite")
 OUT_PATH = Path(f"data/out/tech_footprint_shard{SHARD_ID}.ndjson")
 LIMIT = 0              # 0 = ALLA
 RESUME = True
