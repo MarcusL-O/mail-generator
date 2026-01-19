@@ -34,3 +34,4 @@ def empty_sql(col: str) -> str:
 
 def print_kv(key: str, value: Any) -> None:
     print(f"{key:<24} {value}")
+
