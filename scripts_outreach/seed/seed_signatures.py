@@ -11,7 +11,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 
-DB_PATH = Path("data/outreach.db.sqlite")
+DB_PATH = Path("data/db/outreach.db.sqlite")
 
 # Kommentar (svenska): Matchar seed_templates.py:
 # name = f"signature_{rel.as_posix()}"

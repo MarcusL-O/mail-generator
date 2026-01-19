@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple, List
 
-OUTREACH_DB_PATH = Path("data/outreach.db.sqlite")
+OUTREACH_DB_PATH = Path("data/db/outreach.db.sqlite")
 
 
 # Kommentar (svenska): ISO-tid i UTC för DB-loggning

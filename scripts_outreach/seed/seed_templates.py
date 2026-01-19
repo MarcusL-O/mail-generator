@@ -2,7 +2,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 
-DB_PATH = Path("data/outreach.db.sqlite")
+DB_PATH = Path("data/db/outreach.db.sqlite")
 TEMPLATES_ROOT = Path("templates")
 
 def read_file(path: Path) -> str:

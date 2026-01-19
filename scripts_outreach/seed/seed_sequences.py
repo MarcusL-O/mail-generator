@@ -15,7 +15,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 import re
 
-DB_PATH = Path("data/outreach.db.sqlite")
+DB_PATH = Path("data/db/outreach.db.sqlite")
 
 # Vilka kampanjer vi vill ha i MVP
 # Kommentar (svenska): Vi kör en kampanj per audience som innehåller intro + followups i steg.

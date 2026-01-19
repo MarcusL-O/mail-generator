@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 
-COMPANIES_DB = Path("data/companies.db.sqlite")
-OUTREACH_DB = Path("data/outreach.db.sqlite")
+COMPANIES_DB = Path("data/db/companies.db.sqlite")
+OUTREACH_DB = Path("data/db/outreach.db.sqlite")
 
 
 def now_iso() -> str:

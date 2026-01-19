@@ -45,7 +45,7 @@ def main():
     tpl = safe(args.template.replace(".html", "").replace(".txt", "").replace("/", "_"))
     company = safe(args.company_name)
 
-    out_dir = Path("data/out")
+    out_dir = Path("data/out/email_previews")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     out_path = out_dir / f"{stamp}_{tpl}_{company}.html"

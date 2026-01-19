@@ -41,7 +41,7 @@ SHARD_TOTAL = args.shard_total
 # ÄNDRA HÄR
 # =========================
 DB_PATH = Path("data/db/companies.db.sqlite")
-OUT_PATH = Path(f"data/out/hiring_review_shard{SHARD_ID}.ndjson")
+OUT_PATH = Path(f"data/out/shards/hiring_review_shard{SHARD_ID}.ndjson")
 LIMIT = 0              # 0 = ALLA
 RESUME = True
 PRINT_EVERY = 50

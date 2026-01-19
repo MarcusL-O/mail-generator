@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-DB_PATH = Path("data/outreach.db.sqlite")
+DB_PATH = Path("data/db/outreach.db.sqlite")
 
 # Kommentar (svenska): Stödjer {{key}} och {{key | default:""}} (som dina templates)
 _PLACEHOLDER_RE = re.compile(
