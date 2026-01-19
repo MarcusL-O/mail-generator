@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 import json
 
-DB_PATH = Path("data/outreach.db.sqlite")
+DB_PATH = Path("data/db/outreach.db.sqlite")
 
 
 def now_iso() -> str:

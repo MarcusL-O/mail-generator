@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 import json
 
-DB_PATH = Path("data/outreach.db.sqlite")
+DB_PATH = Path("data/db/outreach.db.sqlite")
 
 
 def now_iso() -> str:
@@ -27,7 +27,7 @@ def main():
 
     ts = now_iso()
 
-    # 1) Stoppa vidare utskick i kampanjen (central broms: stopped_reason)
+    # 1) Stoppa vidare utskick i kampanjen
     cur.execute(
         """
         UPDATE lead_campaigns
@@ -36,6 +36,7 @@ def main():
         """,
         (ts, args.lead_id, args.campaign_id),
     )
+    stopped_rows = cur.rowcount
 
     # 2) Logga event (för statistik/spårbarhet)
     cur.execute(
@@ -54,8 +55,8 @@ def main():
     con.commit()
     con.close()
 
-    print("✓ mark_replied")
-    print(f"lead_id={args.lead_id} campaign_id={args.campaign_id}")
+    print("✓ mark_replied_by_org")
+    print(f"lead_id={args.lead_id} campaign_id={args.campaign_id} stopped_rows={stopped_rows}")
 
 
 if __name__ == "__main__":

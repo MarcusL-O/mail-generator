@@ -4,37 +4,122 @@
 # - hitta rätt template för step+variant
 # - kalla render_email()
 # - i dry-run: bara logga email_messages (ingen SMTP)
-# - (valfritt) advance_state: uppdatera step/next_send_at
 
 import argparse
 import sqlite3
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 
-from scripts_outreach.send.shared.send_utils import (
-    connect_db,
-    get_setting,
-    get_int_setting,
-    is_dry_run,
-    choose_primary_email,
-    upsert_email_message,
-    now_iso,
-)
-
 from scripts_outreach.render.render_email import render_email
+
+DB_PATH = Path("data/db/outreach.db.sqlite")
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _get_setting(con: sqlite3.Connection, key: str, default: Optional[str] = None) -> Optional[str]:
+    cur = con.cursor()
+    cur.execute("SELECT value FROM settings WHERE key = ? LIMIT 1", (key,))
+    row = cur.fetchone()
+    return str(row["value"]) if row else default
+
+
+def _get_int_setting(con: sqlite3.Connection, key: str, default: int) -> int:
+    v = _get_setting(con, key, None)
+    if v is None:
+        return default
+    try:
+        return int(str(v).strip())
+    except ValueError:
+        return default
+
+
+def _is_dry_run(con: sqlite3.Connection) -> bool:
+    v = (_get_setting(con, "dry_run", "1") or "1").strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
+
+
+def _parse_emails(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    s = value.strip()
+    if not s:
+        return []
+    if s.startswith("["):
+        try:
+            import json
+            arr = json.loads(s)
+            if isinstance(arr, list):
+                return [str(x).strip() for x in arr if str(x).strip()]
+        except Exception:
+            pass
+    if "," in s:
+        return [p.strip() for p in s.split(",") if p.strip()]
+    return [s]
+
+
+def _choose_primary_email(emails_value: Optional[str]) -> Optional[str]:
+    emails = _parse_emails(emails_value)
+    return emails[0] if emails else None
+
+
+def _upsert_email_message(
+    con: sqlite3.Connection,
+    *,
+    lead_id: int,
+    campaign_id: int,
+    template_id: Optional[int],
+    step: int,
+    variant: Optional[str],
+    to_email: str,
+    from_email: str,
+    subject_rendered: str,
+    body_rendered: str,
+    status: str,
+    scheduled_at: Optional[str] = None,
+    sent_at: Optional[str] = None,
+    error: Optional[str] = None,
+) -> int:
+    ts = now_iso()
+    cur = con.cursor()
+    cur.execute(
+        """
+        INSERT INTO email_messages
+        (lead_id, campaign_id, template_id, step, variant, to_email, from_email,
+         subject_rendered, body_rendered, status, scheduled_at, sent_at, error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            lead_id,
+            campaign_id,
+            template_id,
+            step,
+            variant,
+            to_email,
+            from_email,
+            subject_rendered,
+            body_rendered,
+            status,
+            scheduled_at,
+            sent_at,
+            error,
+            ts,
+            ts,
+        ),
+    )
+    return int(cur.lastrowid)
+
+
 def _pick_template_for_step(
     con: sqlite3.Connection, campaign_id: int, step: int, preferred_variant: Optional[str]
 ) -> Tuple[int, str]:
-    """
-    Returnerar (template_id, variant) för given campaign+step.
-    Om preferred_variant saknas/fel → tar första variant som finns (A/B/C).
-    """
     cur = con.cursor()
 
     if preferred_variant:
@@ -86,13 +171,9 @@ def _get_template_name(con: sqlite3.Connection, template_id: int) -> str:
 
 
 def _build_context_from_lead(row: sqlite3.Row, con: sqlite3.Connection) -> dict:
-    """
-    Kommentar (svenska):
-    Vi skickar bara in kända fält. Templates kan använda default:"" för resten.
-    """
-    from_name = get_setting(con, "from_name", "") or ""
-    from_email = get_setting(con, "from_email", "") or ""
-    reply_to = get_setting(con, "reply_to", "") or ""
+    from_name = _get_setting(con, "from_name", "") or ""
+    from_email = _get_setting(con, "from_email", "") or ""
+    reply_to = _get_setting(con, "reply_to", "") or ""
 
     return {
         "orgnr": row["orgnr"],
@@ -101,31 +182,23 @@ def _build_context_from_lead(row: sqlite3.Row, con: sqlite3.Connection) -> dict:
         "sni_codes": row["sni_codes"] or "",
         "website": row["website"] or "",
         "emails": row["emails"] or "",
-        "contact_name": "",  # vi har ingen kontaktperson i MVP
-        "your_company": from_name,  # om du vill: byt senare till eget settings-key
+        "contact_name": "",
+        "your_company": from_name,
         "your_contact_info": reply_to or from_email,
     }
 
 
 def _setting_bool(con: sqlite3.Connection, key: str, default: str = "0") -> bool:
-    v = (get_setting(con, key, default) or default).strip().lower()
+    v = (_get_setting(con, key, default) or default).strip().lower()
     return v in ("1", "true", "yes", "y", "on")
 
 
 def _build_order_by(con: sqlite3.Connection) -> str:
-    """
-    Kommentar (svenska):
-    Bygger ORDER BY baserat på settings:
-      - prioritize_tier: tier 1 först, NULL sist
-      - prioritize_score: hög score först inom tier
-    Fallback alltid: next_send_at ASC, lead_campaign_id ASC
-    """
     prioritize_tier = _setting_bool(con, "prioritize_tier", "1")
     prioritize_score = _setting_bool(con, "prioritize_score", "1")
 
     parts = []
     if prioritize_tier:
-        # SQLite: NULL sist via (tier IS NULL) ASC
         parts.append("(lc.tier IS NULL) ASC")
         parts.append("lc.tier ASC")
     if prioritize_score:
@@ -137,22 +210,20 @@ def _build_order_by(con: sqlite3.Connection) -> str:
 
 
 def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
-    con = connect_db()
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
     try:
-        dry = is_dry_run(con)
+        dry = _is_dry_run(con)
         if not dry:
             raise SystemExit("dry_run=0 men SMTP/send är inte implementerat här ännu. Sätt dry_run=1.")
 
         campaign_id = _get_campaign_id(con, campaign_name)
 
-        # Kommentar (svenska): om limit inte skickas in kan du låta settings styra senare.
-        # Här håller vi din CLI-logik intakt.
         now = now_iso()
         cur = con.cursor()
 
         order_by_sql = _build_order_by(con)
 
-        # Kommentar (svenska): hämta leads i kö som är 'due'
         cur.execute(
             f"""
             SELECT
@@ -188,7 +259,7 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
             print("Inga leads är due ✅")
             return
 
-        from_email = get_setting(con, "from_email", None)
+        from_email = _get_setting(con, "from_email", None)
         if not from_email:
             raise ValueError("settings.from_email saknas (kör seed_settings.py och sätt OUTREACH_FROM_EMAIL).")
 
@@ -196,7 +267,7 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
         skipped = 0
 
         for r in rows:
-            to_email = choose_primary_email(r["emails"])
+            to_email = _choose_primary_email(r["emails"])
             if not to_email:
                 skipped += 1
                 continue
@@ -208,10 +279,9 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
             template_name = _get_template_name(con, template_id)
 
             context = _build_context_from_lead(r, con)
-            subject, html, txt = render_email(template_name=template_name, context=context)
+            subject, html, _txt = render_email(template_name=template_name, context=context)
 
-            # Kommentar (svenska): I dry-run loggar vi bara email_messages som "queued"
-            _message_id = upsert_email_message(
+            _upsert_email_message(
                 con,
                 lead_id=int(r["lead_id"]),
                 campaign_id=campaign_id,
@@ -221,7 +291,7 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
                 to_email=to_email,
                 from_email=from_email,
                 subject_rendered=subject,
-                body_rendered=html,  # vi sparar HTML i MVP här
+                body_rendered=html,
                 status="queued",
                 scheduled_at=now,
                 sent_at=None,
@@ -231,10 +301,9 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
             created += 1
 
             if advance_state:
-                # Kommentar (svenska): flytta lead i sekvensen (step+1) och sätt nästa send.
-                min_h = get_int_setting(con, "min_delay_between_steps_hours", 24)
-                max_h = get_int_setting(con, "max_delay_between_steps_hours", 72)
-                delay_h = min_h if max_h <= min_h else min_h  # ingen slump i MVP
+                min_h = _get_int_setting(con, "min_delay_between_steps_hours", 24)
+                max_h = _get_int_setting(con, "max_delay_between_steps_hours", 72)
+                delay_h = min_h if max_h <= min_h else min_h
 
                 next_send = (_utc_now() + timedelta(hours=delay_h)).isoformat()
 
@@ -248,7 +317,6 @@ def run_engine(*, campaign_name: str, limit: int, advance_state: bool):
                     (step + 1, variant, next_send, now, int(r["lead_campaign_id"])),
                 )
 
-            # Kommentar (svenska): commit per lead (robust). Optimera senare om du vill.
             con.commit()
 
         print("DONE ✅")
