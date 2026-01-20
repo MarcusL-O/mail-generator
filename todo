@@ -2,10 +2,15 @@ FÄRDIG PRODUKT – NY MASTERPLAN
 
 
 todo 
-fixa requirments.txt så att jag får med alla beroenden . 
+¨gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
+skriv alathundar
+1 manuell mitt i pitchen till customer, vad vill jag ta reda på
+2 efter att en supplier har svarat , behöver jag få reda på x antal grejer för att allt juridiskt, pengar, och för att kunna skicka till customer.
 
-behöver logik för att få ett ämne på mejlet så inte det är tomt varje gång. 
-implementera backup på vps, finns chatgpt chatt för att slutföra sista stegen
+fixa requirments.txt så att jag får med alla beroenden . --kanske klar
+
+behöver logik för att få ett ämne på mejlet så inte det är tomt varje gång. --kankse klar ser det vid testing senare
+implementera backup på vps, finns chatgpt chatt för att slutföra sista stegen    -- typ klar
 sni, gruppering --- klar
 scb api script 
 testning 
@@ -14,11 +19,11 @@ göra github privat
 gör marknadsunderöknings sokument, sammanfattning efter jag lärt mig de tjag behöver veta
 kolla igen om man kan ta reda på inkomst eller ngt sån likvärdig indikator om dem går bra eller dåligt
 uppdatera vps:en
-testa alla data hämtar script där, flytta db till nya tabell
+testa alla data hämtar script där, flytta db till nya tabell, testa igen här på vs cod eså alal db strängar sitter. 
 hitta en backuplösning   --klar bara implementera på vps
 gör en manuell backup nu --behövs inte
 skriv en manuell lathund för vad jag behöver från dem olika möterna 
-juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad.
+juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad. --logik klar behöver slipas på för att få den snyggare
 kolla om det går att göra vissa saker nedan.
 
 
@@ -101,8 +106,8 @@ Dokumentera flödet tydligt (för dig + pitch)
 
 SUPPLIER – JURIDIK & AFFÄR
 
-Skriv standardavtal för leverantörer
-Definiera ersättning per bokat möte
+Skriv standardavtal för leverantörer -- klar
+Definiera ersättning per bokat möte 
 Definiera success fee vid affär
 Definiera när betalningsskyldighet uppstår
 Definiera tidsperiod för affär (ex: 6–12 månader efter möte)
