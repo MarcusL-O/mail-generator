@@ -2,7 +2,11 @@ FÄRDIG PRODUKT – NY MASTERPLAN
 
 
 todo 
-sni, gruppering
+fixa requirments.txt så att jag får med alla beroenden . 
+
+behöver logik för att få ett ämne på mejlet så inte det är tomt varje gång. 
+implementera backup på vps, finns chatgpt chatt för att slutföra sista stegen
+sni, gruppering --- klar
 scb api script 
 testning 
 göra github privat 
@@ -11,8 +15,8 @@ gör marknadsunderöknings sokument, sammanfattning efter jag lärt mig de tjag 
 kolla igen om man kan ta reda på inkomst eller ngt sån likvärdig indikator om dem går bra eller dåligt
 uppdatera vps:en
 testa alla data hämtar script där, flytta db till nya tabell
-hitta en backuplösning
-gör en manuell backup nu 
+hitta en backuplösning   --klar bara implementera på vps
+gör en manuell backup nu --behövs inte
 skriv en manuell lathund för vad jag behöver från dem olika möterna 
 juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad.
 kolla om det går att göra vissa saker nedan.
