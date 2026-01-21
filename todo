@@ -2,6 +2,106 @@ FÄRDIG PRODUKT – NY MASTERPLAN
 
 
 todo 
+sen när du är klar med allt , allt funkar, testascripten och kolla upp säg 5st bolag och se om den datan vi har angett är 100% rätt
+annars får vi skruv apå logiken , ( gör detta innan vi implementerar logiken på alla bolag, detta för att säkra rätt data på rätt plats.
+
+kör in alla bolag i db du har innan du kör ekonomi scriptet. 
+separat script som bedömmer deras ekonmiska kraft i poäng, signal , ngt sånt. 
+
+fixa hur jag hämtar dem nya grejerna jag hittade, årsredovising, revisor, kaos grejen, ngt mer ? 
+
+
+DET GÅR ATT FÅ EKONOMI UPPGIFTER. 
+https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html
+https://vardefulla-datamangder.bolagsverket.se/arsredovisningar/
+
+
+revisorer: det kan ju vara en bra filtrering för då kan jag kontkata revisorer som leverantöre och hitta kunder utan revisor,
+ matcha - pengar ? bra, implementera. 
+ https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html
+
+https://static.bolagsverket.se/statistik/rev_forbehall.csv
+
+
+bedöma kaos i företaget, ung ledning, vd byte/ledamot, ny vd ny budget kanske, köpsignal ? 
+Suppleanter – vad & signal
+
+Suppleant = ersättare om ordinarie ledamot inte kan.
+
+Signal:
+– Många suppleanter → otrygg styrelse
+– Aktivt använda suppleanter → hög churn
+➡️ Risk/kaos-signal, bra för jurist/revisor/försäkring
+fattar inte varför det är relevant dock.
+
+Snabba förändringar – hur du ser riktning
+
+– Flera ändringar samma år
+– Roller tillsätts/ersätts ofta
+
+Tolkning:
+– Tillväxt (skalar upp) eller
+– Problem (folk lämnar)
+
+Ålder i ledning – varför relevant
+
+Unga ledningar:
+– Vill växa, bygga, köpa tjänster
+– Tar risk, byter leverantörer
+
+Äldre ledningar:
+– Tänker succession
+– Pension, ägarbyte, försäkring, exit
+
+➡️ Ger rätt pitch till rätt bolag
+
+Slutsats:
+Du får tidpunkt + behov + rätt leverantör.
+Det är exakt vad bra matchning kräver.
+https://bolagsverket.se//statistik/foretradare_historik.csv
+https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html
+
+
+todo 
+
+kolla upp hur andra bolag gör det, snabba upp det du kan implementera . 
+framtiden bygga ett billig sida, marknadsföra den genom outreach och högst upp på google grejer. där ska man göra likt ervicefinder. 
+har supplier som väntar på att slutkunder ska skriva in vad dem vill ha gjort,  leverantörer får upp dem arbetsförfrågningarna, skickar offerter, budgivning. kan ta en månadskostad från leverantörer. 
+eller om jag bygger en sida likt goava också som visar min mejl outreach funktion. har lite snygga ui bilder så det ser proffsigt ut, kosta på vad det kostar, räkna när jag går +-0 på den iden. 
+
+bolagsverket har årsredovisingar, kankse bygga ett script som går in där skriver ett org nummer, får info om deras ekonomi, spara ner på bolaget.
+sen apply scriptet, köra md flersa shards ? går det ?
+
+
+hur man får bättre målgruppsanalys 
+1. analysera deras mest lönsamma kunder
+använd exstern data för komplett bild: kolla i deras ICP, vad är icp.
+skräddarsy kundesns önskemål, behov och erbjudanden , komunkation. 
+automatisrea
+analysera data script ? för att se vad kunden söker, behöver, matcha med data, hitta guldkorn. 
+
+finns några jävla ekonomirapporter 
+bestäm nicher, på dem olika 
+måste ha bra filtrering
+
+goava har företagsdata på 
+omsättningsklassbetalningsförmåga
+eget kapital bland annat
+
+måste gå att få reda på provisionsgrundandevissa bolag scrapar linkedin , hur (webshark)
+ai integrationer hur kan man göra det, 
+
+guava ger ett värde "between 4 and 20 % revenue change last year, , vill h angn indikation om dem går bra eller går dpligt. 
+annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja att inte betala om det är dålig relevans på kunderna. 
+finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
+
+sni kan vara riktigt dåliga ibland, ex: didup matchar inte , potatisar som byggt det. 
+ett script som kollar alal bolag och ger vad den tror att deras sni eller arbete bör vara.
+ett script som gör en bedömning om man ska sortera på sni eller på det man hämtar från web, eller omd et är ett stort script som kan 
+implementera båda, kolla överväga, om den hittar en missmatch, skriv in och det värde blir bättre filtrering. "
+
+ett till script i targeting där jag bara kan skriva in dem mejl som ska skickas till. då kan jag testa och skicka till alla vänner osv. 
+bör vara i targeting som är rätt folder för det
 ¨gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
 skriv alathundar
 1 manuell mitt i pitchen till customer, vad vill jag ta reda på
