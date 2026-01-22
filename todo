@@ -1,8 +1,18 @@
 FÄRDIG PRODUKT – NY MASTERPLAN
 
+MVP är att ha massa data , hämtat alla den datan om stockholm och göteborg. köra pilot och endast fokusera på didup
+lära mig av det, utveckla vidare , förbättra, ta input, implementera reviews? raiting från didup och customer, krydda dem ? 
+lägg upp en ny plan då fixa development branch
 
 todo 
+!!hitta på en lösning så ai kan se all kod, mycket som inte kommer fungera!!
 1. 
+
+
+1. 
+gör om db med ett script.  ---klar men behöver implementeras !!!!!!!!
+kommer stå mass kommentarer somd u msåte läsa innan du kör det scriptet med att migrera. 
+
 skriva upp vad jag behöver manuellt ladda ner nya filer och köra vilka script ? fler csv filer uppdateras 1 måndagen i månaden osv 
 sen när du är klar med allt , allt funkar, testascripten och kolla upp säg 5st bolag och se om den datan vi har angett är 100% rätt
 annars får vi skruv apå logiken , ( gör detta innan vi implementerar logiken på alla bolag, detta för att säkra rätt data på rätt plats.
@@ -48,7 +58,8 @@ guava ger ett värde "between 4 and 20 % revenue change last year, , vill h angn
 annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja att inte betala om det är dålig relevans på kunderna. 
 finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
 ---------------------------------------------------------
-4.
+4. 
+--klar men läs igenom sen ------------------------
 sni kan vara riktigt dåliga ibland, ex: didup matchar inte , potatisar som byggt det. 
 ett script som kollar alal bolag och ger vad den tror att deras sni eller arbete bör vara.
 ett script som gör en bedömning om man ska sortera på sni eller på det man hämtar från web, eller omd et är ett stort script som kan 
@@ -56,8 +67,9 @@ implementera båda, kolla överväga, om den hittar en missmatch, skriv in och d
 sen ändra grupp sni filtreringen, där det isället blir på det mest relevanta den läggs in i dem olika grupperna. 
 
 5.
-ett till script i targeting där jag bara kan skriva in dem mejl som ska skickas till. då kan jag testa och skicka till alla vänner osv. 
-bör vara i targeting som är rätt folder för det
+---------klar-----------------------har inte smtp, kommer inte ha rätt yrke flör bolaget , den går bara på sni
+ett till script i send där jag bara kan skriva in dem mejl som ska skickas till. då kan jag testa och skicka till alla vänner osv. 
+bör vara i send som är rätt folder för det
 6.
 gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
 skriv alathundar
@@ -74,8 +86,9 @@ behöver logik för att få ett ämne på mejlet så inte det är tomt varje gå
 10.
 implementera backup på vps, finns chatgpt chatt för att slutföra sista stegen    -- typ klar
 
-sni, gruppering --- klar
+sni, gruppering --- klar men kommer behöva ändras !!!!!!!!!!!!!!!!!!!!!
 11
+--- tror klar --- bara rensa db  och få den snygg !. 
 scb api script 
 antal annställda, antal arbetsställen, inte komun men region västra götaland 
 bolagsverket ? 
@@ -111,8 +124,10 @@ gå igenom varje script, skicka in till ai, kolla efter fle, men var noga med at
 
 17.
 sätt upp mallar på vad du vill ha från leverantör / customer 
+18.
+ implementera smtp innan test
 
-18. 
+19. 
 testing
 1.testa alla data hämtar script i vs code, pusha github
 2. pull på vps, implementera alla migrations ( hitta på ngn smart lösning)
@@ -126,8 +141,10 @@ gå ingeom db kolumner och kolla om vi behöver städa.
 
 . om ngt inte funkar, fixa diretk, testa, gå till nästa, all testing klar, gör massa stora test bar för att verifiera den som klar, kolla mde en testare hur man testar den ?
 
-
 19. 
+ska jag göra testing script ? kolla sb, kolla kod osv eller overkill?, kolla pipelines ? 
+
+20. 
 kolla igenom och definera detta nedan
 
 se över juridiskt avtal- stämmer det, gör resarch, visa mattias eller per elelr ngn. 
@@ -160,3 +177,6 @@ visa tankar på vidare utveckling, automatiskt tänk, säg till och med min sjuk
 säg att folk har as mycket data hur dem själva har svarat på allt, ganksa få olika typer av mejl, som jag skicakr bara till supplier, customer, mejlen kommer skiljs aig men det kommer bara finnas x antal frgåro, x antal olika sätt att skriva det. inte så stor variation. 
 kan vara en lsöning för andra företag. 
 
+estetiskt script som kan kolla hemsdiorna också, väga in det i deras betyg för att hitta kunder som kan vara bra för FE utveklare
+
+hitta ngn lösning för att kunna kontakta utvecklarkosnulter, se på ngt sätt vad dem gör att dem behöver utvecklare BE, , hur ? ingen annign inte mvp
