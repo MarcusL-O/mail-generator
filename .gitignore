@@ -68,4 +68,8 @@ desktop.ini
 .mypy_cache/
 
 
+data/economy/**
+!data/economy/.gitkeep
+
+
 script_SNI_get_api.py

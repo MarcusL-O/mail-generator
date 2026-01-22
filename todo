@@ -196,7 +196,12 @@ dem mapparna osv ska ligga i vs code då så jag kan pusha det, sen pulla det p�
 !!!!!!!!!!!!!!!!!!!!!!!!
 
 -----------------------------
-
+då ska jag hem och göra vps, ladda ner dem ekonominfilerna, sortera osv, lägga in dem på min vs code på min dator (tillfälligt).
+ testa allt, få det att fungera, skicka allt till vps, testa allt, spara, sen migrera db, sen testa allt igen, bara att scripten startar är dem testerna .
+  coh att det hämtas ngt i /out filerna. sen implementera smtp, sen mega ultra nogrann testing, städ justering, utveckling klart
+  , bara sätta vps att hämta all data så den heal tiden tuggar och köttar genom allt .
+ sen måste jag lägga in alla bolag från göteborg. hade en dum filtrering som tog bort några i början. kolla om mitt bulk import script kan göra det utan att skriva över data .
+  utveckling klar ? 
 Hur mycket utveckling är kvar (kort & konkret)
 
 Det som faktiskt är kvar att göra innan allt funkar:
