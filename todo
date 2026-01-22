@@ -2,79 +2,32 @@ FÄRDIG PRODUKT – NY MASTERPLAN
 
 
 todo 
+1. 
+skriva upp vad jag behöver manuellt ladda ner nya filer och köra vilka script ? fler csv filer uppdateras 1 måndagen i månaden osv 
 sen när du är klar med allt , allt funkar, testascripten och kolla upp säg 5st bolag och se om den datan vi har angett är 100% rätt
 annars får vi skruv apå logiken , ( gör detta innan vi implementerar logiken på alla bolag, detta för att säkra rätt data på rätt plats.
 
-kör in alla bolag i db du har innan du kör ekonomi scriptet. 
-separat script som bedömmer deras ekonmiska kraft i poäng, signal , ngt sånt. 
+kör in alla bolag i db du har innan du kör ekonomi scriptet. -- behövs nog inte 
+separat script som bedömmer deras ekonmiska kraft i poäng, signal , ngt sånt.   ---klar
 
-fixa hur jag hämtar dem nya grejerna jag hittade, årsredovising, revisor, kaos grejen, ngt mer ? 
+2.
+ekonomi ----- typ klar
+kvar ekonomi, ladda ner alla csv filer, gruppera in dem i ex 2024 folders. ladda upp till vps. 
 
+revisor -- går inte
+kaos grejen -- går inte 
 
-DET GÅR ATT FÅ EKONOMI UPPGIFTER. 
-https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html
-https://vardefulla-datamangder.bolagsverket.se/arsredovisningar/
-
-
-revisorer: det kan ju vara en bra filtrering för då kan jag kontkata revisorer som leverantöre och hitta kunder utan revisor,
- matcha - pengar ? bra, implementera. 
- https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html
-
-https://static.bolagsverket.se/statistik/rev_forbehall.csv
-
-
-bedöma kaos i företaget, ung ledning, vd byte/ledamot, ny vd ny budget kanske, köpsignal ? 
-Suppleanter – vad & signal
-
-Suppleant = ersättare om ordinarie ledamot inte kan.
-
-Signal:
-– Många suppleanter → otrygg styrelse
-– Aktivt använda suppleanter → hög churn
-➡️ Risk/kaos-signal, bra för jurist/revisor/försäkring
-fattar inte varför det är relevant dock.
-
-Snabba förändringar – hur du ser riktning
-
-– Flera ändringar samma år
-– Roller tillsätts/ersätts ofta
-
-Tolkning:
-– Tillväxt (skalar upp) eller
-– Problem (folk lämnar)
-
-Ålder i ledning – varför relevant
-
-Unga ledningar:
-– Vill växa, bygga, köpa tjänster
-– Tar risk, byter leverantörer
-
-Äldre ledningar:
-– Tänker succession
-– Pension, ägarbyte, försäkring, exit
-
-➡️ Ger rätt pitch till rätt bolag
-
-Slutsats:
-Du får tidpunkt + behov + rätt leverantör.
-Det är exakt vad bra matchning kräver.
-https://bolagsverket.se//statistik/foretradare_historik.csv
-https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html
-
-
-todo 
-
-kolla upp hur andra bolag gör det, snabba upp det du kan implementera . 
+3. 
+kolla upp hur andra bolag gör det, snabba upp det du kan implementera . blir del av marknadsförningsdokumentet och framtida utvecklingar i dev branch 
 framtiden bygga ett billig sida, marknadsföra den genom outreach och högst upp på google grejer. där ska man göra likt ervicefinder. 
 har supplier som väntar på att slutkunder ska skriva in vad dem vill ha gjort,  leverantörer får upp dem arbetsförfrågningarna, skickar offerter, budgivning. kan ta en månadskostad från leverantörer. 
 eller om jag bygger en sida likt goava också som visar min mejl outreach funktion. har lite snygga ui bilder så det ser proffsigt ut, kosta på vad det kostar, räkna när jag går +-0 på den iden. 
 
-bolagsverket har årsredovisingar, kankse bygga ett script som går in där skriver ett org nummer, får info om deras ekonomi, spara ner på bolaget.
-sen apply scriptet, köra md flersa shards ? går det ?
 
-
+tips: nedan
+------------------------------------------------------
 hur man får bättre målgruppsanalys 
-1. analysera deras mest lönsamma kunder
+ analysera deras mest lönsamma kunder
 använd exstern data för komplett bild: kolla i deras ICP, vad är icp.
 skräddarsy kundesns önskemål, behov och erbjudanden , komunkation. 
 automatisrea
@@ -85,128 +38,99 @@ bestäm nicher, på dem olika
 måste ha bra filtrering
 
 goava har företagsdata på 
-omsättningsklassbetalningsförmåga
-eget kapital bland annat
+omsättningsklassbetalningsförmåga -- har
+eget kapital bland annat --har 
 
-måste gå att få reda på provisionsgrundandevissa bolag scrapar linkedin , hur (webshark)
+måste gå att få reda på provisionsgrundande vissa bolag scrapar linkedin , hur (webshark)
 ai integrationer hur kan man göra det, 
 
 guava ger ett värde "between 4 and 20 % revenue change last year, , vill h angn indikation om dem går bra eller går dpligt. 
 annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja att inte betala om det är dålig relevans på kunderna. 
 finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
-
+---------------------------------------------------------
+4.
 sni kan vara riktigt dåliga ibland, ex: didup matchar inte , potatisar som byggt det. 
 ett script som kollar alal bolag och ger vad den tror att deras sni eller arbete bör vara.
 ett script som gör en bedömning om man ska sortera på sni eller på det man hämtar från web, eller omd et är ett stort script som kan 
 implementera båda, kolla överväga, om den hittar en missmatch, skriv in och det värde blir bättre filtrering. "
+sen ändra grupp sni filtreringen, där det isället blir på det mest relevanta den läggs in i dem olika grupperna. 
 
+5.
 ett till script i targeting där jag bara kan skriva in dem mejl som ska skickas till. då kan jag testa och skicka till alla vänner osv. 
 bör vara i targeting som är rätt folder för det
-¨gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
+6.
+gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
 skriv alathundar
+7.
 1 manuell mitt i pitchen till customer, vad vill jag ta reda på
 2 efter att en supplier har svarat , behöver jag få reda på x antal grejer för att allt juridiskt, pengar, och för att kunna skicka till customer.
 
-fixa requirments.txt så att jag får med alla beroenden . --kanske klar
+8.
+fixa requirments.txt så att jag får med alla beroenden . --kanske klar nej
 
+9.
+kollas i testing
 behöver logik för att få ett ämne på mejlet så inte det är tomt varje gång. --kankse klar ser det vid testing senare
+10.
 implementera backup på vps, finns chatgpt chatt för att slutföra sista stegen    -- typ klar
+
 sni, gruppering --- klar
+11
 scb api script 
-testning 
-göra github privat 
-
-gör marknadsunderöknings sokument, sammanfattning efter jag lärt mig de tjag behöver veta
-kolla igen om man kan ta reda på inkomst eller ngt sån likvärdig indikator om dem går bra eller dåligt
-uppdatera vps:en
-testa alla data hämtar script där, flytta db till nya tabell, testa igen här på vs cod eså alal db strängar sitter. 
-hitta en backuplösning   --klar bara implementera på vps
-gör en manuell backup nu --behövs inte
-skriv en manuell lathund för vad jag behöver från dem olika möterna 
-juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad. --logik klar behöver slipas på för att få den snyggare
-kolla om det går att göra vissa saker nedan.
-
-
-
-vad händer om jag har skickat ett mail till en mailadress som är fel, felstavad, fel hämtad, borttagen , det får inte krascha allt . 
-!! gör github privat sen !!
-!! går det att se tidigare årets antal anställda, förösk spara det varje månad eller varje år eller vaje kvartal, vill h avraje månad för att få den mest relevanta datan. men
-
-kolla upp en stor nackedl kankse iaf. didup har tidiagre använt dig av företag som hittar x antal kunder per kvartal eller ngt . mot en abonemangskostand. har vart missnöjda varför ? vad tog dem betalt
-likast min ide, behöver vara billigare
-
-!!!
-behöver bygga en samlingsgrupp sni , eller sortering i db . säg om mitt ända krav är bolag som har kontor. då vill jag slippa skriva 15 olika sni:er . istället grupperaa dem på ngt sätt. kankse fungerar med börjar på 6543 betyder kontor eller ngt
-!!!
-
-Utveckla klart all logik     ---KLAR
-Lägg alla relevanta triggers/filters
- -1: hemsida score, 1-10, hur bra den är. ---KLAR
- -2: om dem letar kollegor.       ---KLAR
- -3: tekniskt fotavtryck, om dem behöver support, avänder 365 , micorosft ecosystem kolla      ---KLAR
-
-SCB (öppet API / Statistikmyndigheten)   -----klar men saknar nyckel 
-- Antal anställda (senaste tillgängliga)
-- Antal arbetsställen (workplaces)
-- Kommun + län/region (t.ex. Västra Götaland)
-
-Antal företag fördelat på omsättningsklass (xlsx) finns på scb --- inte bra data, ger snitt baserat på storlek, inte bra data
-det nedan för vet jag inte om det stämmer eler om jag har
-
-
+antal annställda, antal arbetsställen, inte komun men region västra götaland 
+bolagsverket ? 
+bolagsform ab osvstatus, aktivit, avregistrerat osv, regdatum.
+logik för att hämta ny reggade bolag (hämtas månadsvis/kvartalsvis via SCB, men Bolagsverket kan ge bättre datum per bolag)
 https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html?utm_source=chatgpt.com
 här ges det csv-fil på nya bolag varje månad, ladda ner, skicka in i db , varje månad , manuellt. 
 
-Bolagsverket
-- Bolagsform (AB / HB / KB / Enskild firma / osv)
-- Status: aktivt vs avregistrerat/nerlagt
-- Registreringsdatum / ändringsdatum (för bra “freshness” och urval)
-- Nyregistrerade bolag (hämtas månadsvis/kvartalsvis via SCB, men Bolagsverket kan ge bättre datum per bolag)
-- Offentlig vs privat sektor ( vet inte om det är SCB eller bolagsverket)
+  nytt script sortera upp bättre så jag har rätt antal cites.  stad måste bli bättre. kansek dropp city och köra komun på alla ? lättast ? är man i göteborgskomun är man i göteborg osv. 
 
 
--gamla 
- -4 statestikmyndingheten öppet api
- -4bger antal anställda
- -4c bättre targeting ? nytt script sortera upp bättre så jag har rätt antal cites. 
- -4d status om bolaget är nerlagt
- - om det är ab eller enksilt osv 
- 4-e kan få komun och län också
- -f skatt också men det kankse är onödigt ?
- -5 fixa från bolagsverket så att du får bra datum på alla kolla var 90 dag eller ngt efter nya ? bolag?
- -5 via scb kan du hämta nyregistrerade bolag varje månda/kvartal
- -6 offentlig vs privat sektor det är bra7- antal arbetställen 
- -5 SCB arbetställen- ger komun/ region ex. västra götaland osv --ingen api nyckel--bara att köra --den på 4:an kan hitta samam kör på den
--gamla
+offentlig vs privat sektor
+12.
+göra github privat 
+
+13.
+gör marknadsunderöknings sokument, sammanfattning efter jag lärt mig de tjag behöver veta
+kolla igen om man kan ta reda på inkomst eller ngt sån likvärdig indikator om dem går bra eller dåligt
+uppdatera vps:en
+
+14.
+skriv en manuell lathund för vad jag behöver från dem olika möterna 
+juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad. --logik klar behöver slipas på för att få den snyggare
+15. 
+ett script som kollar antal annställda dem har , logga deras tidigare i samma tabelllösning som vi har gjort för ekonomi, spara ett värde i companies och det är deras faktiskta annställda. 
+logga tidigarea annställda för att se ett mönster på tillväxt eller inte. i annställda. 
+
+16
+sluta utveckla , gör klart targeting (resten bör inte behöva ändras)
+17. skriv en stor guide på allt, se över alla script och lägg tydliga kommentarer högst upp, som säger vad scriptet gör i ordning, lite nödvändiga kommentarer i koden för att veta om ngt händer. 
+ta bort tydliga ai konstiga grejer främst kommentarer, men kankse vissa onödiga mega koller. 
+gå igenom varje script, skicka in till ai, kolla efter fle, men var noga med att inte låta den ändra, inte göra det overkill osv. om jag ändrar ngt ska det finnas en tydlig klar annledning varför 
+
+17.
+sätt upp mallar på vad du vill ha från leverantör / customer 
+
+18. 
+testing
+1.testa alla data hämtar script i vs code, pusha github
+2. pull på vps, implementera alla migrations ( hitta på ngn smart lösning)
+3. se över stoplogiken i alla aspekter
+4. vad händer om jag har skickat ett mail till en mailadress som är fel, felstavad, fel hämtad, borttagen , det får inte krascha allt . 
+5. se över sändhastighet, warmupo logik
+6. verifiera allt i db för att se att det händer ngttest skicka till valda mejls, se att dem får hur dem ser ut.
+7.test skicka allt till det jag har på didup, typ i targeting filen lägg in en rad där man kan sortera på företag, eller gör ett targeting script som matchar typ bara didup och se om dem kommer upp, test skicka osv. 
+8.Testa allt via dry-run + simuleringar
+gå ingeom db kolumner och kolla om vi behöver städa.
+
+. om ngt inte funkar, fixa diretk, testa, gå till nästa, all testing klar, gör massa stora test bar för att verifiera den som klar, kolla mde en testare hur man testar den ?
 
 
-Förbättra targeting per uppdrag/leverantör
-Inför poängsystem (konfigurerbart, ej hårt krav) --- nej, jag lägger alla triggers/filtrering jag har i targeting, väljer om jag vill ha dem eller inte med i denna targetingen för mailutskikc x till företag x. poängsystem behövs inte. 
+19. 
+kolla igenom och definera detta nedan
 
-
-
-
-
-
-
-
-
-
-tror klar syucket nedan
-
-Implementera stopp-logik (stopped_reason som central sanning)--klar
-Implementera bounce-hantering (hard/soft → stoppa direkt)
-Implementera complaint-hantering (spam → do_not_contact + stoppa kampanj) --nej
-Implementera unsubscribe (länk → do_not_contact, ingen UI) -- nej
-Implementera sändhastighet (global + per kampanj)
-Implementera warmup-logik (lågt → upptrappning)
-Testa allt via dry-run + simuleringar
-Verifiera DB-state före/efter varje scenario
-Dokumentera flödet tydligt (för dig + pitch)
-
-SUPPLIER – JURIDIK & AFFÄR
-
-Skriv standardavtal för leverantörer -- klar
+se över juridiskt avtal- stämmer det, gör resarch, visa mattias eller per elelr ngn. 
 Definiera ersättning per bokat möte 
 Definiera success fee vid affär
 Definiera när betalningsskyldighet uppstår
@@ -214,7 +138,6 @@ Definiera tidsperiod för affär (ex: 6–12 månader efter möte)
 Definiera rapporteringsskyldighet från leverantör
 Definiera rätt till uppföljning och revision vid behov
 HUR DU VET ATT AFFÄR SKETT (KRITISK DEL)
-
 Kräv avtalad rapportering från leverantör
 Knyt affär till orgnr + mötes-ID
 Logga bokat möte i systemet
@@ -225,17 +148,15 @@ Ingen veckovis mejljakt behövs
 
 OPERATIV MODELL (REALISTISK)
 
-Du äger sanningen i systemet
-Leverantören har rapporteringsansvar
-Systemet stoppar och loggar – människor bekräftar affärer
-Långa säljcykler hanteras via tidsregler, inte påminnelsemejl
+kolla igen om vi saknar ngn logik viktig del
+om inget akut, skit i det, sätt upp en development branch, sätt task där isf. för att gå till produktion måste allt redan finnas eller, utvecklat hur mycket som helst nu känns det som . 
+viktigt när du jobbar med development, jobba långsamt och säkert, gör en grej eller 2-3 aldrig mer, testa allt. skicka produktion. jobba så istället för att få en helt ny development som skiljer si g is truktur och allting helt. 
 
-sätt upp mallar på vad du vill ha från leverantör / customer 
-bra att kolla på när du amnuellt mejlar, för att få all info du behöver för att göra affär
 
-SLUTSTATUS
+ducking klar
+jobba på pitch, smmanställ allt, visa ett bra demo för dem, visa i deras mejlbox, visa dem olika templates, visa nackdelar, hur jag sk atackla dem. visa affärsplan, visa marknadsundersökning, visa konkurrenter, varför jag är bättre än dem ( konkurenskraftig iaf ) 
+vad min lösning kostar, vad som krävs för att break even, antal timmar (tid) det kommer ta att göra arbetet varje månad. visa att det är esmi automatiskt. 
+visa tankar på vidare utveckling, automatiskt tänk, säg till och med min sjuka ide om att låta ai sköta all ma nuell hantering. ( bara den kankse man kan sälja ) licenser på den. om jag får den att funka as bra för mig och denna är för mejlkonsversationer. då är det ju egnetligen bara kundes data man behöver. 
+säg att folk har as mycket data hur dem själva har svarat på allt, ganksa få olika typer av mejl, som jag skicakr bara till supplier, customer, mejlen kommer skiljs aig men det kommer bara finnas x antal frgåro, x antal olika sätt att skriva det. inte så stor variation. 
+kan vara en lsöning för andra företag. 
 
-Systemet är färdigutvecklat
-Kräver bara operativ setup + tester
-Redo för pitch
-Redo för live när beslut tas
