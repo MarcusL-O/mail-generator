@@ -149,8 +149,18 @@ gå ingeom db kolumner och kolla om vi behöver städa.
 . om ngt inte funkar, fixa diretk, testa, gå till nästa, all testing klar, gör massa stora test bar för att verifiera den som klar, kolla mde en testare hur man testar den ?
 
 19. 
-ska jag göra testing script ? kolla sb, kolla kod osv eller overkill?, kolla pipelines ? 
+ska jag göra testing script ? kolla sb, kolla kod osv eller overkill?, kolla pipelines ?
+21.
+fixa egen orchestator som kör get_data yaml loopar, kör shards, apply, loop. sen måste vi kankse göra en till för alla api script. så dem kör 1 och 1 i kö, loop. 
+någon fallback så inte allt blir knas när det inte finns mer bolag att kolla. sov 60 min efter en körning eller ngt, vet inte, ngt smart.  
+23. 
+gör en orchestrator för outreach också, seddar alltid osv, den kör bara allt samck, jag väljer targeting eller ngt smart. så jag slipper köra alla manuellet,
+utan jag väljer targeting, manuell mitt inlagd, sen den bam,bam,abm, skickat och klart via att jag skriver run pipelines outreach 
 
+22. implementera postgress på vps, skala upp vps så den klarar min orchestartor grej och ha dp, postgress sak,
+fixa säkerhet, instllation, backups confa om ?, driften få den auto, semi auto, övervakning manuellt, men mina script, 
+ bygga övervakning så jag 1 gång i månaden får uppdateingar, antal mejl skickade, antal bolag som hämtat x data osv, 
+ sen alerts ? som skickas om den kraschar så jag inte fortsätter mata mejl til ingen ? eller mejl skickade fast blir inget innehåll typ, bränenr kunder
 20. 
 kolla igenom och definera detta nedan
 

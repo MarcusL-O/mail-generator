@@ -25,7 +25,7 @@ HTTP_TIMEOUT = 30
 MAX_RETRIES = 4
 BASE_BACKOFF = 0.6
 
-DB_PATH_DEFAULT = "data/companies.db.sqlite"
+DB_PATH_DEFAULT = "data/db/companies.db.sqlite"
 
 def iso_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
