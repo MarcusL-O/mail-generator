@@ -1,5 +1,3 @@
-# companies/control/restore_db_from_azure.py
-# Kommentar (svenska):
 # - Laddar ner backup från Azure Blob för valt datum
 # - Packar upp .gz
 # - Ersätter DB-filerna i data/db/

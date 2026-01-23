@@ -1,5 +1,3 @@
-# companies/control/backup_db_to_azure.py
-# Kommentar (svenska):
 # - Tar konsistent backup av SQLite via sqlite3 .backup
 # - Gzipp:ar backupen
 # - Laddar upp till Azure Blob (RBAC) med --auth-mode login
@@ -42,7 +40,7 @@ def require_file(p: Path) -> None:
 
 
 def sqlite_backup(src: Path, dst: Path) -> None:
-    # Kommentar (svenska): .backup ger konsistent snapshot även om DB skrivs samtidigt.
+    # .backup ger konsistent snapshot även om DB skrivs samtidigt.
     run(["sqlite3", str(src), f".backup '{dst.as_posix()}'"])
 
 

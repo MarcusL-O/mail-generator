@@ -54,16 +54,8 @@ guava ger ett värde "between 4 and 20 % revenue change last year, , vill h angn
 annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja att inte betala om det är dålig relevans på kunderna. 
 finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
 ---------------------------------------------------------
-4. 
-uppdatera sni grupp scriptet mot det scriptet som kollar vad dem gör, gör ngt smart. 
+ 
 
-5.
----------klar-----------------------har inte smtp, kommer inte ha rätt yrke flör bolaget , den går bara på sni
-ett till script i send där jag bara kan skriva in dem mejl som ska skickas till. då kan jag testa och skicka till alla vänner osv. 
-bör vara i send som är rätt folder för det
-6.
-gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
-skriv alathundar    ----------- inte MVP --------- eller ? vill jag no ha på en hemisda ändå. 
 7.
 1 manuell mitt i pitchen till customer, vad vill jag ta reda på
 2 efter att en supplier har svarat , behöver jag få reda på x antal grejer för att allt juridiskt, pengar, och för att kunna skicka till customer.
@@ -74,12 +66,12 @@ fixa requirments.txt så att jag får med alla beroenden . --kanske klar nej
 9.
 kollas i testing
 behöver logik för att få ett ämne på mejlet så inte det är tomt varje gång. --kankse klar ser det vid testing senare
-10.
-implementera backup på vps, finns chatgpt chatt för att slutföra sista stegen    -- typ klar
 
-sni, gruppering --- klar men kommer behöva ändras !!!!!!!!!!!!!!!!!!!!!
+
+
 11
---- tror klar --- bara rensa db  och få den snygg !. 
+sch api script!
+bara rensa db  och få den snygg !. 
 scb api script 
 antal annställda, antal arbetsställen, inte komun men region västra götaland 
 bolagsverket ? 
@@ -89,9 +81,8 @@ https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsb
 här ges det csv-fil på nya bolag varje månad, ladda ner, skicka in i db , varje månad , manuellt. 
 
   nytt script sortera upp bättre så jag har rätt antal cites.  stad måste bli bättre. kansek dropp city och köra komun på alla ? lättast ? är man i göteborgskomun är man i göteborg osv. 
-
-
 offentlig vs privat sektor
+
 12.
 göra github privat 
 
@@ -104,13 +95,7 @@ uppdatera vps:en
 skriv en manuell lathund för vad jag behöver från dem olika möterna 
 juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad. --logik klar behöver slipas på för att få den snyggare
 
-15. 
---------klar----------------------
-ett script som kollar antal annställda dem har , logga deras tidigare i samma tabelllösning som vi har gjort för ekonomi, spara ett värde i companies och det är deras faktiskta annställda. 
-logga tidigarea annställda för att se ett mönster på tillväxt eller inte. i annställda. 
 
-16
-sluta utveckla , gör klart targeting (resten bör inte behöva ändras)
 17. 
 skriv en stor guide på allt, se över alla script och lägg tydliga kommentarer högst upp, som säger vad scriptet gör i ordning, lite nödvändiga kommentarer i koden för att veta om ngt händer. 
 ta bort tydliga ai konstiga grejer främst kommentarer, men kankse vissa onödiga mega koller. 
@@ -139,8 +124,7 @@ gå ingeom db kolumner och kolla om vi behöver städa.
 
 . om ngt inte funkar, fixa diretk, testa, gå till nästa, all testing klar, gör massa stora test bar för att verifiera den som klar, kolla mde en testare hur man testar den ?
 
-19. 
-ska jag göra testing script ? kolla sb, kolla kod osv eller overkill?, kolla pipelines ?
+
 21.
 fixa egen orchestator som kör get_data yaml loopar, kör shards, apply, loop. sen måste vi kankse göra en till för alla api script. så dem kör 1 och 1 i kö, loop. 
 någon fallback så inte allt blir knas när det inte finns mer bolag att kolla. sov 60 min efter en körning eller ngt, vet inte, ngt smart.  
@@ -148,7 +132,8 @@ någon fallback så inte allt blir knas när det inte finns mer bolag att kolla.
 gör en orchestrator för outreach också, seddar alltid osv, den kör bara allt samck, jag väljer targeting eller ngt smart. så jag slipper köra alla manuellet,
 utan jag väljer targeting, manuell mitt inlagd, sen den bam,bam,abm, skickat och klart via att jag skriver run pipelines outreach 
 
-22. implementera postgress på vps, skala upp vps så den klarar min orchestartor grej och ha dp, postgress sak,
+22. 
+implementera postgress på vps, skala upp vps så den klarar min orchestartor grej och ha dp, postgress sak,
 fixa säkerhet, instllation, backups confa om ?, driften få den auto, semi auto, övervakning manuellt, men mina script, 
  bygga övervakning så jag 1 gång i månaden får uppdateingar, antal mejl skickade, antal bolag som hämtat x data osv, 
  sen alerts ? som skickas om den kraschar så jag inte fortsätter mata mejl til ingen ? eller mejl skickade fast blir inget innehåll typ, bränenr kunder
@@ -236,3 +221,7 @@ Städ/justering
 
 Allt annat är redan byggt eller sekundärt.
 När ovan är klart → du kan börja hämta data & köra pilot.
+
+6.
+gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
+skriv alathundar    ----------- inte MVP --------- eller ? vill jag no ha på en hemisda ändå. 
