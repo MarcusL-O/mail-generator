@@ -12,16 +12,16 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
 
-from scripts_outreach.send.shared.send_utils import (
+from outreach.send.shared.send_utils import (
     connect_db,
     get_setting,
     is_dry_run,
     upsert_email_message,
     ensure_out_dir,
 )
-from scripts_outreach.render.render_email import render_email
-from scripts_outreach.render.render_contract import render_contract
-from scripts_outreach.render.render_contract_to_pdf import contract_text_to_pdf
+from outreach.render.render_email import render_email
+from outreach.render.render_contract import render_contract
+from outreach.render.render_contract_to_pdf import contract_text_to_pdf
 
 
 def now_iso() -> str:

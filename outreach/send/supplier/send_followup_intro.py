@@ -1,5 +1,5 @@
 import argparse
-from scripts_outreach.send.shared.send_engine import run_engine
+from outreach.send.shared.send_engine import run_engine
 
 def main():
     ap = argparse.ArgumentParser()
