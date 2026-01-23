@@ -13,19 +13,15 @@ todo
 gör om db med ett script.  ---klar men behöver implementeras !!!!!!!!
 kommer stå mass kommentarer somd u msåte läsa innan du kör det scriptet med att migrera. 
 
+2.
 skriva upp vad jag behöver manuellt ladda ner nya filer och köra vilka script ? fler csv filer uppdateras 1 måndagen i månaden osv 
 sen när du är klar med allt , allt funkar, testascripten och kolla upp säg 5st bolag och se om den datan vi har angett är 100% rätt
 annars får vi skruv apå logiken , ( gör detta innan vi implementerar logiken på alla bolag, detta för att säkra rätt data på rätt plats.
 
-kör in alla bolag i db du har innan du kör ekonomi scriptet. -- behövs nog inte 
-separat script som bedömmer deras ekonmiska kraft i poäng, signal , ngt sånt.   ---klar
 
 2.
-ekonomi ----- typ klar
 kvar ekonomi, ladda ner alla csv filer, gruppera in dem i ex 2024 folders. ladda upp till vps. 
 
-revisor -- går inte
-kaos grejen -- går inte 
 
 3. 
 kolla upp hur andra bolag gör det, snabba upp det du kan implementera . blir del av marknadsförningsdokumentet och framtida utvecklingar i dev branch 
@@ -59,12 +55,7 @@ annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja 
 finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
 ---------------------------------------------------------
 4. 
---klar men läs igenom sen ------------------------
-sni kan vara riktigt dåliga ibland, ex: didup matchar inte , potatisar som byggt det. 
-ett script som kollar alal bolag och ger vad den tror att deras sni eller arbete bör vara.
-ett script som gör en bedömning om man ska sortera på sni eller på det man hämtar från web, eller omd et är ett stort script som kan 
-implementera båda, kolla överväga, om den hittar en missmatch, skriv in och det värde blir bättre filtrering. "
-sen ändra grupp sni filtreringen, där det isället blir på det mest relevanta den läggs in i dem olika grupperna. 
+uppdatera sni grupp scriptet mot det scriptet som kollar vad dem gör, gör ngt smart. 
 
 5.
 ---------klar-----------------------har inte smtp, kommer inte ha rätt yrke flör bolaget , den går bara på sni
