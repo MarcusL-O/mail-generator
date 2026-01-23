@@ -1,13 +1,12 @@
-# enrich_scb_bundle.py
-# Kommentar: Enrichar companies via SCB (1 request per orgnr):
+# Enrichar companies via SCB (1 request per orgnr):
 # - scb_employees_class (storleksklass anställda)
 # - scb_workplaces_count (antal arbetsställen)
 # - scb_postort (postort/stad)
 # - scb_municipality (kommun)
 # - scb_region (län normaliserat till regionnamn utan "län")
 #
-# Kommentar: Refresh efter REFRESH_DAYS även om status blev unknown.
-# Kommentar: Sparar ändringar i en historiktabell så du ser växt/krymp över tid.
+# Refresh efter REFRESH_DAYS även om status blev unknown.
+# Sparar ändringar i en historiktabell så du ser växt/krymp över tid.
 
 import os
 import time
@@ -65,7 +64,7 @@ def iso_plus_days(days: int) -> str:
     return (datetime.utcnow().replace(microsecond=0) + timedelta(days=days)).isoformat() + "Z"
 
 def normalize_region(county: str) -> str:
-    # Kommentar: "Västra Götalands län" -> "Västra Götaland"
+    #"Västra Götalands län" -> "Västra Götaland"
     v = (county or "").strip()
     if not v:
         return ""
@@ -74,7 +73,7 @@ def normalize_region(county: str) -> str:
     return v.strip()
 
 def deep_find_value(obj, target_keys: set[str]):
-    # Kommentar: Letar efter första matchande nyckel rekursivt (dict/list)
+    #Letar efter första matchande nyckel rekursivt (dict/list)
     if isinstance(obj, dict):
         for k, v in obj.items():
             if isinstance(k, str) and k in target_keys:
@@ -108,7 +107,7 @@ def to_int(v):
     return None
 
 def parse_scb(payload: dict):
-    # Kommentar: Nycklar från SCB-spec (vi matchar både “snälla” och exakt-nycklar)
+    #Nycklar från SCB-spec (vi matchar både “snälla” och exakt-nycklar)
     emp_keys = {
         "storleksklassAnstallda", "antalAnstalldaStorleksklass",
         "StklKod", "stklKod", "Stkl, kod", "Stkl, kod ",
@@ -137,8 +136,8 @@ def parse_scb(payload: dict):
     return emp_class, workplaces, postort, municipality, region
 
 def make_scb_session():
-    # Kommentar: P12/PFX kräver requests_pkcs12 eller konvertering till PEM.
-    # Kommentar: Vi använder din .env:
+    # P12/PFX kräver requests_pkcs12 eller konvertering till PEM.
+    # Vi använder din .env:
     # SCB_CERT_PATH=/path/to/scb_cert.p12
     # SCB_CERT_PASSWORD=...
     cert_path = must_env("SCB_CERT_PATH")
@@ -163,7 +162,7 @@ def fetch_one(session: requests.Session, orgnr: str):
     status: ok | unknown | not_found | err
     """
     base_url = must_env("SCB_BASE_URL").rstrip("/")
-    url = f"{base_url}/foretag/{orgnr}"  # Kommentar: byt path om din SCB-gateway kräver annat
+    url = f"{base_url}/foretag/{orgnr}"  #byt path om din SCB-gateway kräver annat
 
     last_err = ""
 
@@ -226,7 +225,7 @@ def fetch_one(session: requests.Session, orgnr: str):
     return (UNKNOWN_MARK, None, UNKNOWN_MARK, UNKNOWN_MARK, UNKNOWN_MARK, "err", last_err or "err")
 
 def ensure_history_table(cur: sqlite3.Cursor):
-    # Kommentar: Historik för triggers (växt/krymp) utan att röra companies-schema mer.
+    #Historik för triggers (växt/krymp) utan att röra companies-schema mer.
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS scb_company_changes (
@@ -263,7 +262,7 @@ def main():
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
-    # Kommentar: index (valfritt men bra)
+    #index (valfritt men bra)
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_CITY} ON {TABLE}({COL_CITY});")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_SNI_CODES} ON {TABLE}({COL_SNI_CODES});")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_NEXT_CHECK_AT} ON {TABLE}({COL_NEXT_CHECK_AT});")
@@ -289,7 +288,7 @@ def main():
         where_city = f"AND LOWER({COL_CITY}) IN ({placeholders})"
         params.extend(cities)
 
-    # Kommentar: Bara bolag med riktig SNI + refresh efter 90 dagar
+    # Bara bolag med riktig SNI + refresh efter 90 dagar
     cur.execute(
         f"""
         SELECT {COL_ORGNR}
@@ -323,7 +322,7 @@ def main():
 
     try:
         for orgnr in orgnrs:
-            # Kommentar: hämta gamla värden för historik
+            # hämta gamla värden för historik
             cur.execute(
                 f"""
                 SELECT {COL_EMP_CLASS}, {COL_WORKPLACES}, {COL_POSTORT}, {COL_MUNICIPALITY}, {COL_REGION}
@@ -339,7 +338,7 @@ def main():
             checked_at = iso_now()
             next_check = iso_plus_days(REFRESH_DAYS)
 
-            # Kommentar: logga förändringar (för triggers)
+            #logga förändringar (för triggers)
             log_change(cur, orgnr, COL_EMP_CLASS, old.get(COL_EMP_CLASS), emp_class, checked_at)
             log_change(cur, orgnr, COL_WORKPLACES, old.get(COL_WORKPLACES), workplaces, checked_at)
             log_change(cur, orgnr, COL_POSTORT, old.get(COL_POSTORT), postort, checked_at)

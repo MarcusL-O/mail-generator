@@ -1,5 +1,4 @@
-# companies/control/apply_out_shards_to_db.py
-# Kommentar: Läser shard-ndjson i data/out och applicerar resultatet in i companies-tabellen.
+# Läser shard-ndjson i data/out och applicerar resultatet in i companies-tabellen.
 
 from __future__ import annotations
 
@@ -52,7 +51,7 @@ def _safe_loads(line: str) -> dict[str, Any] | None:
 
 
 def _json_dumps_compact(value: Any) -> str:
-    # Kommentar: DB lagrar listor/objekt som JSON-text
+    #DB lagrar listor/objekt som JSON-text
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -428,7 +427,7 @@ def apply_hiring_file(conn: sqlite3.Connection, ndjson_path: Path) -> dict[str, 
             hiring_what_text = (obj.get("hiring_what_text") or "").strip()
             hiring_count = obj.get("hiring_count", None)
 
-            # Kommentar: evidence_url mappar till hiring_external_urls / hiring_external_urls är kolumnen du har i DB
+            # evidence_url mappar till hiring_external_urls / hiring_external_urls är kolumnen du har i DB
             evidence_url = (obj.get("evidence_url") or "").strip()
             external_job_urls = obj.get("external_job_urls", [])
             merged_urls: list[str] = []
@@ -482,7 +481,7 @@ def main() -> None:
     if not DB_PATH.exists():
         raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
-    # Kommentar: samla alla filer
+    # samla alla filer
     website_files = _list_files(WEBSITES_PATTERNS)
     email_files = _list_files(EMAILS_PATTERNS)
     tech_files = _list_files(TECH_PATTERNS)

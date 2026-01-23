@@ -5,9 +5,9 @@
 #sektor / privat_offentlig
 
 # scb_discover_new_orgnrs.py
-# Kommentar: Hämtar nya bolag från SCB (ingen delta => filtrera på registreringsdatum + state).
-# Kommentar: Ansvar: orgnr + registreringsdatum + juridisk_form + foretagsstatus + sektor + privat/offentlig.
-# Kommentar: Robust: WAL, commit ofta, resume från scb_discover_state, Ctrl+C safe.
+# Hämtar nya bolag från SCB (ingen delta => filtrera på registreringsdatum + state).
+# Ansvar: orgnr + registreringsdatum + juridisk_form + foretagsstatus + sektor + privat/offentlig.
+# Robust: WAL, commit ofta, resume från scb_discover_state, Ctrl+C safe.
 
 import os
 import time
@@ -40,7 +40,7 @@ def db_path() -> str:
     return os.getenv("DB_PATH", DB_PATH_DEFAULT).strip()
 
 def make_scb_session():
-    # Kommentar: SCB cert (p12/pfx) via requests-pkcs12 som i ditt enrich-script
+    # SCB cert (p12/pfx) via requests-pkcs12 som i ditt enrich-script
     cert_path = must_env("SCB_CERT_PATH")
     cert_password = must_env("SCB_CERT_PASSWORD")
 
@@ -79,13 +79,13 @@ def request_with_retry(session: requests.Session, url: str, params: dict):
             time.sleep(BASE_BACKOFF * attempt)
             continue
 
-        # Kommentar: andra fel => fail fast
+        # andra fel => fail fast
         raise SystemExit(f"SCB list error: {r.status_code} body={r.text[:200]}")
 
     raise SystemExit(f"SCB list failed after retries: {last_err}")
 
 def normalize_row(row: dict) -> dict:
-    # Kommentar: Mappa fält från SCB svar. Anpassa nycklar via ENV om din gateway skiljer sig.
+    # Mappa fält från SCB svar. Anpassa nycklar via ENV om din gateway skiljer sig.
     # Default keys:
     # orgnr, registreringsdatum, juridiskForm, foretagsstatus, sektor, privatPublikt
     return {
@@ -105,7 +105,7 @@ def main():
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
-    # Kommentar: state
+    # state
     cur.execute("""
         CREATE TABLE IF NOT EXISTS scb_discover_state (
             id INTEGER PRIMARY KEY CHECK (id=1),
@@ -153,7 +153,7 @@ def main():
             rows = payload.get(results_key, []) or []
 
             if not isinstance(rows, list) or len(rows) == 0:
-                # Kommentar: ingen mer data
+                # ingen mer data
                 break
 
             for raw in rows:
@@ -164,7 +164,7 @@ def main():
 
                 now = iso_now()
 
-                # Kommentar: insert om saknas, annars uppdatera discover-fält
+                # insert om saknas, annars uppdatera discover-fält
                 cur.execute("""
                     INSERT INTO companies (orgnr, created_at, updated_at)
                     VALUES (?, datetime('now'), datetime('now'))
@@ -206,7 +206,7 @@ def main():
                     print("-" * 40)
 
                 if scanned % COMMIT_EVERY == 0:
-                    # Kommentar: spara progress (state) så resume blir exakt
+                    # spara progress (state) så resume blir exakt
                     cur.execute("""
                         UPDATE scb_discover_state
                         SET last_registration_date=?,
@@ -221,7 +221,7 @@ def main():
 
                 time.sleep(SLEEP_SECONDS)
 
-            # Kommentar: sida klar -> bump page, spara state
+            #  sida klar -> bump page, spara state
             page += 1
             cur.execute("""
                 UPDATE scb_discover_state
@@ -236,7 +236,7 @@ def main():
         print("\n⛔ Avbruten – committar & sparar state...")
 
     finally:
-        # Kommentar: vid “ren” avslut: bumpa last_regdate till nu och reset page=1
+        #  vid “ren” avslut: bumpa last_regdate till nu och reset page=1
         # Detta gör att nästa körning bara tittar framåt.
         cur.execute("""
             UPDATE scb_discover_state

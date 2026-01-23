@@ -1,4 +1,4 @@
-# companies/control/db_schema.py
+# retunerar alla fäl, PK, osv
 from __future__ import annotations
 
 import sqlite3
@@ -9,16 +9,13 @@ from typing import Any, Iterable, List
 # KONFIG (samma stil som db_overview.py)
 # =========================
 DB_PATH = Path("data/db/companies.db.sqlite")
-ALT_DB_PATH = Path("data/companies.db.sqlite")  # Kommentar: fallback om du kör utan /db
 # =========================
 
 
 def resolve_db_path() -> Path:
     if DB_PATH.exists():
         return DB_PATH
-    if ALT_DB_PATH.exists():
-        return ALT_DB_PATH
-    raise FileNotFoundError(f"DB saknas: {DB_PATH} (och fallback: {ALT_DB_PATH})")
+    raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
 
 def print_kv(key: str, value: Any) -> None:

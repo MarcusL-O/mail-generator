@@ -45,20 +45,20 @@ OUT_PATH = Path(f"data/out/shards/hiring_review_shard{SHARD_ID}.ndjson")
 LIMIT = 0              # 0 = ALLA
 RESUME = True
 PRINT_EVERY = 50
-REFRESH_DAYS = 30      # Kommentar: rerun efter 30 dagar
+REFRESH_DAYS = 30      # rerun efter 30 dagar
 # =========================
 
 TIMEOUT_SECONDS = 12
 SLEEP_BETWEEN_REQUESTS = 0.15
-MAX_BYTES = 650_000    # Kommentar: vi läser max ~650KB HTML per sida
-MAX_PAGES = 7          # Kommentar: liten crawl-budget (max career-sidor per bolag)
+MAX_BYTES = 650_000    # vi läser max ~650KB HTML per sida
+MAX_PAGES = 7          #  liten crawl-budget (max career-sidor per bolag)
 
 session = requests.Session()
 session.headers.update({
     "User-Agent": f"Mozilla/5.0 (Didup-HiringReview/1.0; shard={SHARD_ID})"
 })
 
-# Kommentar: vi letar bara karriär-sidor på egen domän för YES
+# vi letar bara karriär-sidor på egen domän för YES
 CAREER_PATH_HINTS = [
     "/karriar", "/karriar/", "/karriar/lediga-jobb", "/jobb", "/jobb/", "/lediga-jobb", "/lediga-jobb/",
     "/career", "/careers", "/careers/", "/jobs", "/jobs/", "/job", "/job/",
@@ -66,7 +66,7 @@ CAREER_PATH_HINTS = [
     "/om-oss/karriar", "/om-oss/karriar/", "/about/careers", "/about/careers/",
 ]
 
-# Kommentar: soft keywords (relevansfilter)
+# soft keywords (relevansfilter)
 HIRING_KEYWORDS = [
     "vi söker", "vi soeker", "vi anställer", "vi anstaller", "vi rekryterar",
     "lediga jobb", "ledig tjänst", "ledig tjanst", "karriär", "karriar",
@@ -75,7 +75,7 @@ HIRING_KEYWORDS = [
     "careers", "career", "jobs", "job openings", "apply now",
 ]
 
-# Kommentar: triggers för rolltext (vi vill fånga rollnamn efter frasen)
+# triggers för rolltext (vi vill fånga rollnamn efter frasen)
 ROLE_TRIGGERS = [
     r"\bvi\s+söker\s+",
     r"\bvi\s+soeker\s+",
@@ -86,7 +86,7 @@ ROLE_TRIGGERS = [
     r"\bwe\s+are\s+looking\s+for\s+",
 ]
 
-# Kommentar: externa jobbkällor (indikator => maybe_external, vi följer INTE)
+# externa jobbkällor (indikator => maybe_external, vi följer INTE)
 EXTERNAL_JOB_DOMAINS = [
     "linkedin.com",
     "indeed.com",
@@ -178,7 +178,7 @@ def _safe_url(url: str) -> bool:
 
 
 def _is_retryable_status(code: int) -> bool:
-    # Kommentar: vi retryar INTE 403/429, bara timeout (timeout => ingen rad)
+    # vi retryar INTE 403/429, bara timeout (timeout => ingen rad)
     return code in (403, 429, 500, 502, 503, 504)
 
 
@@ -222,7 +222,7 @@ def fetch_html(url: str) -> tuple[Optional[str], str]:
             r.close()
             return (None, "not_html")
 
-        # Kommentar: läs max MAX_BYTES
+        # läs max MAX_BYTES
         chunks = []
         read = 0
         for chunk in r.iter_content(chunk_size=32_768):
@@ -260,7 +260,7 @@ def normalize_url(u: str) -> str:
 
 
 def strip_text(html: str) -> str:
-    # Kommentar: snabb text-extraktion (räcker för relevans + triggers)
+    # snabb text-extraktion (räcker för relevans + triggers)
     s = html.lower()
     s = re.sub(r"<script[\s\S]*?</script>", " ", s)
     s = re.sub(r"<style[\s\S]*?</style>", " ", s)
@@ -299,7 +299,7 @@ def extract_roles_from_triggers(text: str) -> list[str]:
             cand = (m.group(1) or "").strip()
             cand = re.split(r"[\.!\?\|\;\:\(\)\[\]\{\\\/]", cand)[0].strip()
             cand = re.sub(r"\s+", " ", cand).strip()
-            # Kommentar: rensa vanliga fyllnadsord
+            # rensa vanliga fyllnadsord
             cand = re.sub(
                 r"\b(nu|idag|hos oss|till vårt team|till vart team|just nu|omgående|immediately)\b",
                 "",
@@ -349,11 +349,11 @@ def count_job_post_links(base_url: str, html: str) -> int:
         path = (parts.path or "").lower()
         q = (parts.query or "").lower()
 
-        # Kommentar: filtrera bort “spontanansökan”
+        # filtrera bort “spontanansökan”
         if "spontan" in path or "spontan" in q:
             continue
 
-        # Kommentar: typiska annonslänkar (interna)
+        # typiska annonslänkar (interna)
         is_job_post = (
             "/jobb/" in path
             or "/jobs/" in path
@@ -403,7 +403,7 @@ def hard_hiring_decision_strict(page_url: str, html: str) -> tuple[bool, str, in
 
 
 def extract_internal_career_links(base_url: str, html: str) -> list[str]:
-    # Kommentar: plocka interna länkar som matchar CAREER_PATH_HINTS
+    # plocka interna länkar som matchar CAREER_PATH_HINTS
     html_lower = html.lower()
     hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_lower)
     out: list[str] = []
@@ -446,7 +446,7 @@ def extract_internal_career_links(base_url: str, html: str) -> list[str]:
 
 
 def find_external_job_links(base_url: str, html: str) -> list[str]:
-    # Kommentar: vi följer inte, bara loggar indikator
+    # vi följer inte, bara loggar indikator
     html_lower = html.lower()
     hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_lower)
 
@@ -503,7 +503,7 @@ def load_done_set(path: Path) -> set[str]:
 def pick_targets(conn: sqlite3.Connection, limit: Optional[int]) -> list[tuple[str, str, str, Optional[str]]]:
     cur = conn.cursor()
 
-    # Kommentar: vi tar bara bolag med website, och bara de som behöver refresh
+    # vi tar bara bolag med website, och bara de som behöver refresh
     if limit is None:
         cur.execute(
             """
@@ -577,7 +577,7 @@ def main():
                 html, err = fetch_html(base_url)
                 time.sleep(SLEEP_BETWEEN_REQUESTS)
 
-                # Kommentar: timeout => skriv INTE rad
+                # timeout => skriv INTE rad
                 if err == "timeout":
                     err_timeout += 1
                     continue
@@ -617,23 +617,23 @@ def main():
                     out_f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     continue
 
-                # Kommentar: externa jobblänkar från startsidan (indikator)
+                # externa jobblänkar från startsidan (indikator)
                 ext_urls = find_external_job_links(base_url, html or "")
                 if ext_urls:
                     row["external_job_urls"] = ext_urls
 
-                # Kommentar: STRICT: vi tar INTE beslut på startsidan.
+                # STRICT: vi tar INTE beslut på startsidan.
                 # Startsidan används bara för att hitta karriär-länkar.
                 visited = {base_url}
                 queue: list[str] = []
 
-                # Kommentar: prova vanliga career paths direkt
+                # prova vanliga career paths direkt
                 for p in CAREER_PATH_HINTS:
                     u = urljoin(base_url.rstrip("/") + "/", p.lstrip("/"))
                     if u not in visited:
                         queue.append(u)
 
-                # Kommentar: och interna länkar som matchar career-paths
+                #och interna länkar som matchar career-paths
                 queue.extend(extract_internal_career_links(base_url, html or ""))
 
                 best_yes = False
@@ -655,7 +655,7 @@ def main():
                         timeout_flag = True
                         break
 
-                    # Kommentar: mur => skip
+                    # mur => skip
                     if e2 in ("403", "429"):
                         pages_used += 1
                         continue
@@ -678,12 +678,12 @@ def main():
                         best_evidence = u
                         break
 
-                # Kommentar: timeout under crawl => skriv INTE rad
+                # timeout under crawl => skriv INTE rad
                 if timeout_flag:
                     err_timeout += 1
                     continue
 
-                # Kommentar: slutbeslut
+                #slutbeslut
                 if best_yes:
                     row["hiring_status"] = "yes"
                     row["hiring_count"] = int(best_count)
@@ -692,7 +692,7 @@ def main():
                     row["err_reason"] = ""
                     yes_count += 1
                 else:
-                    # Kommentar: ingen intern jobbsida hittad => no eller maybe_external
+                    # ingen intern jobbsida hittad => no eller maybe_external
                     if row["external_job_urls"]:
                         row["hiring_status"] = "maybe_external"
                         row["hiring_count"] = None

@@ -1,4 +1,4 @@
-# companies/control/shards_input_status.py
+# Kollar om alla shards data kommit in i db
 from __future__ import annotations
 
 import sqlite3
@@ -10,7 +10,6 @@ from typing import Any, Iterable
 # KONFIG (samma stil som db_overview.py)
 # =========================
 DB_PATH = Path("data/db/companies.db.sqlite")
-ALT_DB_PATH = Path("data/companies.db.sqlite")  # Kommentar: fallback om du kör utan /db
 
 SHARDS_OUT_DIR = Path("data/out")
 NDJSON_EXT = ".ndjson"
@@ -28,9 +27,7 @@ PREFIXES = {
 def resolve_db_path() -> Path:
     if DB_PATH.exists():
         return DB_PATH
-    if ALT_DB_PATH.exists():
-        return ALT_DB_PATH
-    raise FileNotFoundError(f"DB saknas: {DB_PATH} (och fallback: {ALT_DB_PATH})")
+    raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
 
 def utc_now_str() -> str:

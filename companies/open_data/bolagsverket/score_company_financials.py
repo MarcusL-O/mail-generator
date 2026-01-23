@@ -1,5 +1,3 @@
-# score_company_financials.py
-# ==========================================
 # Räknar ekonomiska betyg (0–100) från company_financials och sparar i company_financial_scores.
 #
 # Design (robust & resume):
@@ -17,8 +15,7 @@
 # Körning:
 # - Om YEAR är satt (t.ex. YEAR=2026) -> processa bara det året.
 # - Annars -> processa alla år som finns i company_financials.
-#
-# ==========================================
+
 
 import os
 import math

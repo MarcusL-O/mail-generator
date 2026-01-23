@@ -1,24 +1,9 @@
-# import_company_financials.py
-# ==========================================
 # Läser årsredovisningar (iXBRL/XHTML) från zip-filer och skriver ekonomi in i DB.
-#
-# Krav du bad om:
-# - Snabb körning (ingen shards)
-# - Ingen data loss vid Ctrl+C (batch-commit + commit i finally)
-# - Ska inte köra om samma bolag/år i onödan (skip om redan finns i DB)
-# - Får INTE skriva in ekonomi på fel företag:
-#   -> Vi tar orgnr + räkenskapsårsslut från filnamn
-#   -> Vi försöker även läsa orgnr + räkenskapsårsslut ur dokumentet och jämföra
-#      (om mismatch: skippa + logga)
-# - Bolag som inte finns i companies ska skippas
-#
-# Förväntad filstruktur:
-# - Du lägger års-filer på VPS, t.ex:
-#   data/bolagsverket/annual_reports/2024/*.zip
-# - Scriptet hanterar två typer:
-#   A) "container zip" som innehåller många inner-zipar (som din 01_1.zip)
-#   B) "vanliga zips" där zipen direkt innehåller .xhtml
-# ==========================================
+# - Läser .zip-filer rekursivt (container-zip + vanliga zipar).
+# - Identifierar bolag via orgnr + räkenskapsårslut från filnamn.
+# - Validerar orgnr + räkenskapsårslut mot dokumentet (skips vid mismatch).
+# - Extraherar nyckeltal (omsättning, resultat, tillgångar, eget kapital, soliditet m.m.).
+# - Skriver till company_financials med UPSERT (orgnr + räkenskapsår).
 
 import io
 import os

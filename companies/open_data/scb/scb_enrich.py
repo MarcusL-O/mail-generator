@@ -1,5 +1,4 @@
-# scb_enrich.py
-# Kommentar: En enda SCB-enricher (batch/resume) som uppdaterar companies per orgnr (1 request/orgnr):
+#  En enda SCB-enricher (batch/resume) som uppdaterar companies per orgnr (1 request/orgnr):
 # - scb_employees_class
 # - scb_workplaces_count
 # - scb_postort
@@ -7,7 +6,7 @@
 # - scb_region
 # + scb_status, scb_err_reason, scb_checked_at, scb_next_check_at
 #
-# Kommentar: Robust drift:
+# Robust drift:
 # - WAL + commit i batch
 # - Resume via scb_next_check_at
 # - Retry/backoff på 429/503/5xx
@@ -100,7 +99,7 @@ def db_path() -> str:
 
 
 def normalize_region(county: str) -> str:
-    # Kommentar: "Västra Götalands län" -> "Västra Götaland"
+    #"Västra Götalands län" -> "Västra Götaland"
     v = (county or "").strip()
     if not v:
         return ""
@@ -110,7 +109,7 @@ def normalize_region(county: str) -> str:
 
 
 def deep_find_value(obj, target_keys: set[str]):
-    # Kommentar: Letar efter första matchande nyckel rekursivt (dict/list)
+    #Letar efter första matchande nyckel rekursivt (dict/list)
     if isinstance(obj, dict):
         for k, v in obj.items():
             if isinstance(k, str) and k in target_keys:
@@ -147,7 +146,7 @@ def to_int(v):
 
 
 def parse_scb(payload: dict):
-    # Kommentar: Vi matchar både “snälla” och exakta nycklar (SCB varierar ibland i wrappers)
+    #Vi matchar både “snälla” och exakta nycklar (SCB varierar ibland i wrappers)
     emp_keys = {
         "storleksklassAnstallda", "antalAnstalldaStorleksklass",
         "StklKod", "stklKod", "Stkl, kod", "Stkl, kod ",
@@ -177,7 +176,7 @@ def parse_scb(payload: dict):
 
 
 def make_scb_session():
-    # Kommentar: Kräver PFX/P12 -> requests-pkcs12
+    # Kräver PFX/P12 -> requests-pkcs12
     cert_path = must_env("SCB_CERT_PATH")
     cert_password = must_env("SCB_CERT_PASSWORD")
 
@@ -240,13 +239,13 @@ def fetch_one(session: requests.Session, orgnr: str):
         if r.status_code == 404:
             return (UNKNOWN_MARK, None, UNKNOWN_MARK, UNKNOWN_MARK, UNKNOWN_MARK, "not_found", "404", False)
 
-        # Kommentar: SCB-limit/drift -> retry
+        # SCB-limit/drift -> retry
         if r.status_code in (429, 500, 502, 503, 504):
             last_err = str(r.status_code)
             time.sleep(BASE_BACKOFF * attempt)
             continue
 
-        # Kommentar: 403 kan indikera “maxvärde överskridet” enligt SCB-info
+        # 403 kan indikera “maxvärde överskridet” enligt SCB-info
         if r.status_code == 403:
             return (UNKNOWN_MARK, None, UNKNOWN_MARK, UNKNOWN_MARK, UNKNOWN_MARK, "err", "403", True)
 
@@ -311,7 +310,7 @@ def main():
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
-    # Kommentar: Index för snabbare filter/resume
+    # Index för snabbare filter/resume
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_NEXT_CHECK_AT} ON {TABLE}({COL_NEXT_CHECK_AT});")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_CITY} ON {TABLE}({COL_CITY});")
     cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{TABLE}_{COL_SNI_CODES} ON {TABLE}({COL_SNI_CODES});")
@@ -360,7 +359,7 @@ def main():
                 break
 
             for orgnr in batch:
-                # Kommentar: Hämta gamla värden (endast om historik är på)
+                #Hämta gamla värden (endast om historik är på)
                 old = None
                 if enable_history:
                     cur.execute(
@@ -379,7 +378,7 @@ def main():
                 if status in ("ok", "unknown", "not_found"):
                     next_check = iso_plus_days(REFRESH_DAYS)
                 else:
-                    # Kommentar: Vid fel väntar vi kortare (soft) eller längre (hard) innan nytt försök
+                    #Vid fel väntar vi kortare (soft) eller längre (hard) innan nytt försök
                     next_check = iso_plus_days(HARD_ERROR_WAIT_DAYS if hard_error else SOFT_ERROR_WAIT_DAYS)
 
                 if enable_history and old is not None:

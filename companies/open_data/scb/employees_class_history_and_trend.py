@@ -1,5 +1,3 @@
-# employees_class_history_and_trend.py
-# Kommentar:
 # - SNABBT post-process-script (inga HTTP-anrop)
 # - Läser companies.scb_employees_class (klass/spann) och scb_status (om finns)
 # - Loggar ALLTID en rad per bolag per körning i en egen historiktabell
@@ -34,7 +32,7 @@ def table_columns(cur: sqlite3.Cursor, table: str) -> set[str]:
 
 
 def ensure_history_table(cur: sqlite3.Cursor) -> None:
-    # Kommentar: Egen historiktabell för anställda-klass (inte blanda med scb_company_changes)
+    #Egen historiktabell för anställda-klass (inte blanda med scb_company_changes)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS company_employee_class_history (
@@ -55,7 +53,7 @@ def ensure_history_table(cur: sqlite3.Cursor) -> None:
 def ensure_companies_columns(cur: sqlite3.Cursor) -> None:
     cols = table_columns(cur, "companies")
 
-    # Kommentar: Lägg till trendkolumner om de saknas (pre-migration safe)
+    #Lägg till trendkolumner om de saknas (pre-migration safe)
     if "employees_trend" not in cols:
         cur.execute("ALTER TABLE companies ADD COLUMN employees_trend TEXT;")
     if "employees_trend_at" not in cols:

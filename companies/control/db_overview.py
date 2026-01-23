@@ -1,4 +1,4 @@
-# companies/control/db_overview.py
+# retunerar lista med allt i db 
 from __future__ import annotations
 
 import sqlite3
@@ -63,7 +63,7 @@ def print_table_counts(cur: sqlite3.Cursor) -> None:
     ).fetchall()
     for (name,) in rows:
         if name == "leads":
-            continue  # Kommentar: du vill inte se leads här
+            continue  #du vill inte se leads här
         print_kv(name, f"{count_rows(cur, name):,} rows")
 
 
