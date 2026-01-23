@@ -5,13 +5,15 @@
 # - kalla render_email()
 # - i dry-run: bara logga email_messages (ingen SMTP)
 
+
 import argparse
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 
-from scripts_outreach.render.render_email import render_email
+from outreach.render.render_email import render_email
+
 
 DB_PATH = Path("data/db/outreach.db.sqlite")
 

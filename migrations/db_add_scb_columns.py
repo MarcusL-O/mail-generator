@@ -3,7 +3,7 @@
 
 import sqlite3
 
-DB_PATH = "data/companies.db.sqlite"
+DB_PATH = "data/db/companies.db.sqlite"
 TABLE = "companies"
 
 COLUMNS = [

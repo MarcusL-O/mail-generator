@@ -35,16 +35,3 @@ def render_contract(*, context: Dict[str, Any], template_path: Path = CONTRACT_T
 
     # Kommentar (svenska): Trimma onödiga trailing spaces
     return "\n".join([line.rstrip() for line in rendered.splitlines()]).strip() + "\n"
-
-
-if __name__ == "__main__":
-    demo = {
-        "YOUR_COMPANY_NAME": "Din Firma AB",
-        "YOUR_ORGNR": "559000-0000",
-        "SUPPLIER_COMPANY_NAME": "Leverantör AB",
-        "SUPPLIER_ORGNR": "556000-0000",
-        "PRICE_PER_MEETING": "2 500 kr",
-        "SUCCESS_FEE": "5% av affärsvärdet",
-        "PAYMENT_TERMS": "10",
-    }
-    print(render_contract(context=demo)[:1200])

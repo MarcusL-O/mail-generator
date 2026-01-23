@@ -5,6 +5,50 @@ lära mig av det, utveckla vidare , förbättra, ta input, implementera reviews?
 lägg upp en ny plan då fixa development branch
 
 todo 
+
+companies alla script, funktionalitet testa. nedan lägger jag in dem som funkar, iaf startar. bedömma kvaliten får vi göra sen 
+companies\open_data\bolagsverket\bolagsverket_sni.py
+companies\open_data\scb\employees_class_history_and_trend.py ---saknas data bara , men startar
+companies\open_data\scb\scb_discover_new_companies.py --- missing env grejer
+
+kolla upp scb vilka som är old och ska bort 
+gå igneom vilka som ska bort i control också
+kolla i bolagsverket script om dem funkar efter du lagt in ekonomi uppgifter 
+companies\shards\extras\hiring_review_shards.py -- funkar att starta med kommentar om att den inte är bra
+companies\shards\extras\segment_groups.py -- startar men ingen data, inte verifierat om scriptet är bra
+companies\shards\extras\tech_footprint_shards.py startar
+companies\shards\extras\web_review.py startar, men den funkar nog inte output som inte går ihop
+companies\shards\must_have\line_of_work_shard.py startar , fattar inte output
+companies\shards\must_have\shards_find_emails.py startar
+companies\shards\must_have\shards_find_websites.py startar
+companies funkar bara att verifiera data i db och slipa på scriptten så dem ger bra data. 
+
+outreach 
+outreach\control\db_overview.py, funkar
+outreach\control\db_schema.py funkar
+outreach\control\delivery_audit.py , startar men vet inte vad den gör
+outreach\control\domain_reputation.py , startar men vet inte vad den gör
+heal seed funkar
+
+hela render funkar
+outreach\render\render_contract_to_pdf.py denna dock behöver nog ändras för kosntig atecken , sen något sätt som html att kunna se den i en viewr finns de t?
+
+börjat kolla i send
+debugga alla send script
+
+bygg om overview scriptet sen innan tester om det läggs in data i db, för nu saknar den nog några. eller kanse inte ?
+
+
+
+
+
+
+
+
+
+
+
+
 !!hitta på en lösning så ai kan se all kod, mycket som inte kommer fungera!!
 1. 
 
@@ -21,44 +65,6 @@ annars får vi skruv apå logiken , ( gör detta innan vi implementerar logiken 
 
 2.
 kvar ekonomi, ladda ner alla csv filer, gruppera in dem i ex 2024 folders. ladda upp till vps. 
-
-
-3. 
-kolla upp hur andra bolag gör det, snabba upp det du kan implementera . blir del av marknadsförningsdokumentet och framtida utvecklingar i dev branch 
-framtiden bygga ett billig sida, marknadsföra den genom outreach och högst upp på google grejer. där ska man göra likt ervicefinder. 
-har supplier som väntar på att slutkunder ska skriva in vad dem vill ha gjort,  leverantörer får upp dem arbetsförfrågningarna, skickar offerter, budgivning. kan ta en månadskostad från leverantörer. 
-eller om jag bygger en sida likt goava också som visar min mejl outreach funktion. har lite snygga ui bilder så det ser proffsigt ut, kosta på vad det kostar, räkna när jag går +-0 på den iden. 
-
-
-tips: nedan
-------------------------------------------------------
-hur man får bättre målgruppsanalys 
- analysera deras mest lönsamma kunder
-använd exstern data för komplett bild: kolla i deras ICP, vad är icp.
-skräddarsy kundesns önskemål, behov och erbjudanden , komunkation. 
-automatisrea
-analysera data script ? för att se vad kunden söker, behöver, matcha med data, hitta guldkorn. 
-
-finns några jävla ekonomirapporter 
-bestäm nicher, på dem olika 
-måste ha bra filtrering
-
-goava har företagsdata på 
-omsättningsklassbetalningsförmåga -- har
-eget kapital bland annat --har 
-
-måste gå att få reda på provisionsgrundande vissa bolag scrapar linkedin , hur (webshark)
-ai integrationer hur kan man göra det, 
-
-guava ger ett värde "between 4 and 20 % revenue change last year, , vill h angn indikation om dem går bra eller går dpligt. 
-annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja att inte betala om det är dålig relevans på kunderna. 
-finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
----------------------------------------------------------
- 
-
-7.
-1 manuell mitt i pitchen till customer, vad vill jag ta reda på
-2 efter att en supplier har svarat , behöver jag få reda på x antal grejer för att allt juridiskt, pengar, och för att kunna skicka till customer.
 
 8.
 fixa requirments.txt så att jag får med alla beroenden . --kanske klar nej
@@ -91,11 +97,6 @@ gör marknadsunderöknings sokument, sammanfattning efter jag lärt mig de tjag 
 kolla igen om man kan ta reda på inkomst eller ngt sån likvärdig indikator om dem går bra eller dåligt
 uppdatera vps:en
 
-14.
-skriv en manuell lathund för vad jag behöver från dem olika möterna 
-juridiskt avtal, hitta på hur dem ska signiera det och jag ska få den signerad. --logik klar behöver slipas på för att få den snyggare
-
-
 17. 
 skriv en stor guide på allt, se över alla script och lägg tydliga kommentarer högst upp, som säger vad scriptet gör i ordning, lite nödvändiga kommentarer i koden för att veta om ngt händer. 
 ta bort tydliga ai konstiga grejer främst kommentarer, men kankse vissa onödiga mega koller. 
@@ -104,7 +105,7 @@ gå igenom varje script, skicka in till ai, kolla efter fle, men var noga med at
 17.
 sätt upp mallar på vad du vill ha från leverantör / customer 
 18.
- implementera smtp innan test
+implementera smtp innan test
 
 19. 
 testing
@@ -225,3 +226,36 @@ När ovan är klart → du kan börja hämta data & köra pilot.
 6.
 gör klar review scripte, templates, snippets, logik för att kunna få raiting , recensions ruta någonstans eller ngt sånt ´. smart sätt att spara, billigt osv
 skriv alathundar    ----------- inte MVP --------- eller ? vill jag no ha på en hemisda ändå. 
+
+
+3. 
+kolla upp hur andra bolag gör det, snabba upp det du kan implementera . blir del av marknadsförningsdokumentet och framtida utvecklingar i dev branch 
+framtiden bygga ett billig sida, marknadsföra den genom outreach och högst upp på google grejer. där ska man göra likt ervicefinder. 
+har supplier som väntar på att slutkunder ska skriva in vad dem vill ha gjort,  leverantörer får upp dem arbetsförfrågningarna, skickar offerter, budgivning. kan ta en månadskostad från leverantörer. 
+eller om jag bygger en sida likt goava också som visar min mejl outreach funktion. har lite snygga ui bilder så det ser proffsigt ut, kosta på vad det kostar, räkna när jag går +-0 på den iden. 
+
+
+tips: nedan
+------------------------------------------------------
+hur man får bättre målgruppsanalys 
+ analysera deras mest lönsamma kunder
+använd exstern data för komplett bild: kolla i deras ICP, vad är icp.
+skräddarsy kundesns önskemål, behov och erbjudanden , komunkation. 
+automatisrea
+analysera data script ? för att se vad kunden söker, behöver, matcha med data, hitta guldkorn. 
+
+finns några jävla ekonomirapporter 
+bestäm nicher, på dem olika 
+måste ha bra filtrering
+
+goava har företagsdata på 
+omsättningsklassbetalningsförmåga -- har
+eget kapital bland annat --har 
+
+måste gå att få reda på provisionsgrundande vissa bolag scrapar linkedin , hur (webshark)
+ai integrationer hur kan man göra det, 
+
+guava ger ett värde "between 4 and 20 % revenue change last year, , vill h angn indikation om dem går bra eller går dpligt. 
+annat företag tar 3k per bokat möte, ny tjänst dme ska testa, dem kan välja att inte betala om det är dålig relevans på kunderna. 
+finns bolag med ringlistor, jag vill no egnetligen sälja via mejl men kankse kan vara bra, iaf bra att hämta ner datan för att ha till framtiden. 
+---------------------------------------------------------

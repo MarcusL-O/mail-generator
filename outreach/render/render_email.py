@@ -127,24 +127,3 @@ def render_email(
         return subject_rendered, html_rendered, txt_rendered
     finally:
         con.close()
-
-
-if __name__ == "__main__":
-    # Kommentar (svenska): Minimal manuell testkörning
-    # Byt template_name till en som finns i din DB.
-    demo_template = "email_customer_intro/A.html"
-    demo_context = {
-        "company_name": "Demo AB",
-        "your_company": "Din Firma",
-        "city": "Göteborg",
-        "industry_or_service": "IT-konsult",
-        "your_contact_info": "marcus@example.com",
-    }
-
-    try:
-        subj, html, txt = render_email(template_name=demo_template, context=demo_context)
-        print("SUBJECT:\n", subj)
-        print("\nHTML:\n", html[:500], "...\n")
-        print("\nTXT:\n", txt[:500], "...\n")
-    except Exception as e:
-        print("Render failed:", e)

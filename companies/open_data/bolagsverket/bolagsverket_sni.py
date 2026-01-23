@@ -16,7 +16,7 @@ PRINT_EVERY = 250           # progress
 SLEEP_SECONDS = float(os.getenv("SNI_SLEEP_SECONDS", "1.05"))  # ~60/min
 # =========================
 
-DB_PATH = os.getenv("DB_PATH", "data/companies.db.sqlite")
+DB_PATH = os.getenv("DB_PATH", "data/db/companies.db.sqlite")
 TABLE = os.getenv("DB_TABLE", "companies")
 COL_ORGNR = os.getenv("DB_COL_ORGNR", "orgnr")
 COL_CITY = os.getenv("DB_COL_CITY", "city")

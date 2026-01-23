@@ -13,13 +13,16 @@ python send_campaign_to_list.py \
   --orgnr 556677-8899 \
   --all
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import argparse
 import sqlite3
 from pathlib import Path
 from typing import Dict, Any, List
 
-from scripts_outreach.render.render_email import render_email
+from outreach.render.render_email import render_email
 
 COMPANIES_DB = Path("data/db/companies.db.sqlite")
 OUTREACH_DB = Path("data/db/outreach.db.sqlite")
