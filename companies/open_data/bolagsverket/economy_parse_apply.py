@@ -10,12 +10,6 @@
 #   - (orgnr, end_date) som redan finns i company_financials
 # - Skriver NDJSON till: data/economy/annual_{year}.ndjson
 # - UPSERT till table: company_financials
-#
-# Kör:
-#   python scripts_economy/economy_parse_apply.py --year 2024
-#
-# Miljö:
-#   DB_PATH=... (default: data/companies.db.sqlite)
 
 from __future__ import annotations
 
@@ -40,7 +34,7 @@ COMPANIES_COL_ORGNR = os.getenv("COMPANIES_COL_ORGNR", "orgnr")
 PRINT_EVERY = int(os.getenv("PRINT_EVERY", "500"))
 COMMIT_EVERY = int(os.getenv("COMMIT_EVERY", "500"))
 
-BASE_DIR_DEFAULT = "data/bolagsverket/annual_reports"
+BASE_DIR_DEFAULT = "data/economy"
 ECON_DIR_DEFAULT = "data/economy"
 
 # Filnamn-format (inner-zip i container): 5560172933_2023-12-31.zip
@@ -327,8 +321,8 @@ def main() -> None:
                 scanned_docs += 1
 
                 # Årfilter baserat på end_date
-                if not end_a.startswith(str(year)):
-                    continue
+                #if not end_a.startswith(str(year)):
+                    #continue
 
                 orgnr = norm_orgnr(orgnr_a)
                 if len(orgnr) != 10:

@@ -1,21 +1,14 @@
-# scripts_economy/economy_fetch_zips.py
-# Hämtar och sparar årsredovisnings-zippar för ett år.
-# - Listar alla .zip-länkar från en år-sida (HTML med <a href="...zip">)
-# - Laddar ner med resume (Range) om filen redan finns delvis
+# companies/open_data/bolagsverket/economy_fetch_zips.py
+# Hämtar och sparar årsredovisnings-zippar för ett år (bulkfiler).
+# - Försöker lista .zip-länkar från år-sida (om index finns)
+# - Om index saknas (404): bruteforce "NN_M.zip" där NN=01..52 och M=1..max
+# - Resume via .part + Range
 # - Skriver manifest: data/economy/manifests/{year}.txt
-# - Sparar zippar i: data/bolagsverket/annual_reports/{year}/
-#
-# Kör:
-#   python scripts_economy/economy_fetch_zips.py --year 2024 --year-url "https://.../arsredovisningar/2024/"
-#
-# OBS:
-# - Om sidan är JS-renderad och HTML saknar länkar kan du behöva peka på en "rå" index-sida.
-#   Testa först: curl -L <year-url> och se om .zip syns i HTML.
+# - Sparar zippar i: data/economy/{year}/
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
@@ -25,7 +18,7 @@ import requests
 
 ZIP_HREF_RE = re.compile(r'href\s*=\s*["\']([^"\']+\.zip)["\']', re.IGNORECASE)
 
-DEFAULT_BASE = "https://vardefulla-datamangder.bolagsverket.se/arsredovisningar/"
+DEFAULT_BASE = "https://vardefulla-datamangder.bolagsverket.se/arsredovisningar-bulkfiler/arsredovisningar/"
 DEFAULT_TIMEOUT = 60
 
 
@@ -34,7 +27,6 @@ def _ensure_dir(p: Path) -> None:
 
 
 def _safe_filename_from_url(url: str) -> str:
-    # Tar sista path-segmentet som filnamn
     path = urlparse(url).path
     name = Path(path).name
     if not name.lower().endswith(".zip"):
@@ -52,11 +44,11 @@ def extract_zip_urls(html: str, base_url: str) -> list[str]:
     urls: list[str] = []
     for m in ZIP_HREF_RE.finditer(html):
         href = m.group(1).strip()
-        full = urljoin(base_url, href)
-        urls.append(full)
-    # Dedupe men behåll ordning
+        urls.append(urljoin(base_url, href))
+
+    # dedupe (ingen dublett)
     seen = set()
-    out = []
+    out: list[str] = []
     for u in urls:
         if u not in seen:
             out.append(u)
@@ -64,24 +56,22 @@ def extract_zip_urls(html: str, base_url: str) -> list[str]:
     return out
 
 
-def head_content_length(url: str, timeout: int = DEFAULT_TIMEOUT) -> int | None:
+def head_exists(url: str, timeout: int = DEFAULT_TIMEOUT) -> bool:
     try:
-        r = requests.head(url, timeout=timeout, allow_redirects=True, headers={"User-Agent": "economy_fetch/1.0"})
-        if r.status_code >= 400:
-            return None
-        cl = r.headers.get("Content-Length")
-        return int(cl) if cl and cl.isdigit() else None
+        r = requests.head(
+            url,
+            timeout=timeout,
+            allow_redirects=True,
+            headers={"User-Agent": "economy_fetch/1.0"},
+        )
+        return r.status_code < 400
     except Exception:
-        return None
+        return False
 
 
 def download_with_resume(url: str, dest: Path, timeout: int = DEFAULT_TIMEOUT) -> tuple[bool, str]:
-    """
-    Returnerar (downloaded_or_completed, status_text)
-    """
     _ensure_dir(dest.parent)
     tmp = dest.with_suffix(dest.suffix + ".part")
-
     existing = tmp.stat().st_size if tmp.exists() else 0
 
     headers = {"User-Agent": "economy_fetch/1.0"}
@@ -90,10 +80,11 @@ def download_with_resume(url: str, dest: Path, timeout: int = DEFAULT_TIMEOUT) -
 
     with requests.get(url, stream=True, timeout=timeout, headers=headers) as r:
         if r.status_code == 416:
-            # "Range Not Satisfiable" => vi antar att filen redan är komplett
+            # Range Not Satisfiable => anta att filen är komplett
             if not dest.exists() and tmp.exists():
                 tmp.rename(dest)
             return True, "already_complete(416)"
+
         r.raise_for_status()
 
         mode = "ab" if existing > 0 else "wb"
@@ -102,27 +93,64 @@ def download_with_resume(url: str, dest: Path, timeout: int = DEFAULT_TIMEOUT) -
                 if chunk:
                     f.write(chunk)
 
-    # Flytta till slutfil
     if tmp.exists():
         tmp.rename(dest)
 
     return True, "downloaded"
 
 
+def brute_force_zip_urls(year_url: str, max_part: int, miss_streak_stop: int) -> list[str]:
+    """
+    Gissar exakt mönster:
+      NN_M.zip där NN=01..52 och M=1..max_part
+    Stoppar för en given NN när vi fått miss_streak_stop missar i rad.
+    """
+    found: list[str] = []
+    for nn in range(1, 53):
+        prefix = f"{nn:02d}"
+        miss_streak = 0
+
+        for m in range(1, max_part + 1):
+            url = urljoin(year_url, f"{prefix}_{m}.zip")
+            if head_exists(url):
+                found.append(url)
+                miss_streak = 0
+            else:
+                miss_streak += 1
+                if miss_streak >= miss_streak_stop:
+                    break
+
+    # dedupe (ingen dublett)
+    seen = set()
+    out: list[str] = []
+    for u in found:
+        if u not in seen:
+            out.append(u)
+            seen.add(u)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--year", type=int, required=True)
-    ap.add_argument("--year-url", type=str, default=None, help="Exakt URL till år-mappen/sidan (slutar oftast med /)")
+    ap.add_argument("--year-url", type=str, default=None)
     ap.add_argument("--out-dir", type=str, default=None)
     ap.add_argument("--manifest-dir", type=str, default="data/economy/manifests")
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
-    ap.add_argument("--limit", type=int, default=0, help="0 = ingen limit")
+
+    # För bruteforce
+    ap.add_argument("--max-part", type=int, default=60, help="Max _N att testa per NN (default 60)")
+    ap.add_argument("--miss-stop", type=int, default=5, help="Stoppa efter X missar i rad per NN (default 5)")
+
+    # Begränsar *antal kandidater* vi testar (för snabbtest)
+    ap.add_argument("--limit", type=int, default=0, help="0 = ingen limit (debug)")
+
     args = ap.parse_args()
 
     year = args.year
     year_url = args.year_url or urljoin(DEFAULT_BASE, f"{year}/")
 
-    out_dir = Path(args.out_dir or f"data/bolagsverket/annual_reports/{year}")
+    out_dir = Path(args.out_dir or f"data/economy/{year}")
     manifest_dir = Path(args.manifest_dir)
     _ensure_dir(out_dir)
     _ensure_dir(manifest_dir)
@@ -133,21 +161,35 @@ def main() -> None:
     print(f"MANIFEST_DIR: {manifest_dir}")
     print("-" * 60)
 
-    html = fetch_html(year_url, timeout=args.timeout)
-    zip_urls = extract_zip_urls(html, year_url)
+    # 1) Försök HTML-index (om det finns)
+    zip_urls: list[str] = []
+    try:
+        html = fetch_html(year_url, timeout=args.timeout)
+        zip_urls = extract_zip_urls(html, year_url)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, "status_code", None)
+        if status != 404:
+            raise
+
+    # 2) Fallback: bruteforce (det som gäller för din källa)
+    if not zip_urls:
+        print("År-URL saknar index (404) eller gav 0 länkar. Fallback: bruteforce NN_M.zip (01..52)...")
+        zip_urls = brute_force_zip_urls(year_url, max_part=args.max_part, miss_streak_stop=args.miss_stop)
 
     if not zip_urls:
-        print("Hittade 0 zip-länkar i HTML.")
-        print("Tips: kör `curl -L <year-url>` och kontrollera att .zip faktiskt finns i HTML.")
+        print("Hittade inga zip-filer.")
         sys.exit(2)
 
+    # Debug-limit: begränsa listan (kan göra att du missar filer – bara för snabbtest)
     if args.limit and args.limit > 0:
         zip_urls = zip_urls[: args.limit]
 
+    # Manifest
     manifest_path = manifest_dir / f"{year}.txt"
     manifest_path.write_text("\n".join(zip_urls) + "\n", encoding="utf-8")
     print(f"manifest_written: {manifest_path} (count={len(zip_urls)})")
 
+    # Download
     ok = 0
     skipped = 0
     for i, url in enumerate(zip_urls, 1):
