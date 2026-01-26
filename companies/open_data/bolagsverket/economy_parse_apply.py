@@ -27,7 +27,7 @@ from typing import Dict, Iterator, Optional, Tuple
 
 from lxml import etree
 
-DB_PATH = os.getenv("DB_PATH", "data/companies.db.sqlite")
+DB_PATH = os.getenv("DB_PATH", "data/db/companies.db.sqlite")
 COMPANIES_TABLE = os.getenv("COMPANIES_TABLE", "companies")
 COMPANIES_COL_ORGNR = os.getenv("COMPANIES_COL_ORGNR", "orgnr")
 

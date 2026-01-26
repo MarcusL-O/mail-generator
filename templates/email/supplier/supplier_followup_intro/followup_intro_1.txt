@@ -1,0 +1,12 @@
+SUP_FU1_Reminder
+Karaktär: Kort, neutral påminnelse.
+
+Hej ({{ company_name }}),
+
+Ville bara följa upp mitt tidigare mejl ifall det föll mellan stolarna.
+
+Ingen stress alls, jag ville mest säkerställa att mejlet nådde fram.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}

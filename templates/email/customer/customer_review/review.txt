@@ -1,0 +1,21 @@
+CUST_REVIEW_Intro
+Karaktär: Professionell, uppskattande, neutral. Inbjuder till feedback.
+
+Hej ({{ company_name }}),
+
+Tack för att ni tog er tid att svara på vårt meddelande och för mötet.
+
+Vi vill gärna höra hur ni upplevde kontakten och processen hittills.
+Er feedback hjälper oss att säkerställa kvalitet och bli bättre i hur vi matchar företag med rätt leverantörer.
+
+Om du har möjlighet får du gärna dela din upplevelse kring kontakten och mötet.
+Även kort återkoppling är värdefull för oss.
+
+Om det finns andra områden eller tjänster där ni ser behov framöver är ni alltid välkomna att nämna det.
+I sådana fall kan vi gärna hjälpa till att boka kontakt även kring det.
+
+Tack igen för er tid.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}

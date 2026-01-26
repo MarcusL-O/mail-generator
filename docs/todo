@@ -22,6 +22,10 @@ companies\shards\must_have\line_of_work_shard.py startar , fattar inte output
 companies\shards\must_have\shards_find_emails.py startar
 companies\shards\must_have\shards_find_websites.py startar
 companies funkar bara att verifiera data i db och slipa på scriptten så dem ger bra data. 
+ekonomi zip funkar klockrent
+ekonomi lägga dem i json funkar klockrent 
+ekonomi tillväxt script inte testad än. 
+kankse ett till script som tar bort zip filerna sen , bra för orchestrator. men innan det spara ner till usb !!!!! viktigt !!!!
 
 outreach 
 outreach\control\db_overview.py, funkar
@@ -34,7 +38,7 @@ hela render funkar
 outreach\render\render_contract_to_pdf.py denna dock behöver nog ändras för kosntig atecken , sen något sätt som html att kunna se den i en viewr finns de t?
 
 börjat kolla i send
-debugga alla send script
+debugga alla send script, send funkar men inte smtp än 
 
 bygg om overview scriptet sen innan tester om det läggs in data i db, för nu saknar den nog några. eller kanse inte ?
 
@@ -55,7 +59,8 @@ bygg om overview scriptet sen innan tester om det läggs in data i db, för nu s
 
 1. 
 gör om db med ett script.  ---klar men behöver implementeras !!!!!!!!
-kommer stå mass kommentarer somd u msåte läsa innan du kör det scriptet med att migrera. 
+kommer stå mass kommentarer som du måste läsa innan du kör det scriptet med att migrera. 
+dubblkolla så att du alltid har rätt migrationer i db innan, så den nya db får allt direkt bara
 
 2.
 skriva upp vad jag behöver manuellt ladda ner nya filer och köra vilka script ? fler csv filer uppdateras 1 måndagen i månaden osv 
@@ -64,7 +69,7 @@ annars får vi skruv apå logiken , ( gör detta innan vi implementerar logiken 
 
 
 2.
-kvar ekonomi, ladda ner alla csv filer, gruppera in dem i ex 2024 folders. ladda upp till vps. 
+kvar ekonomi, ladda ner alla csv filer, gruppera in dem i ex 2024 folders. ladda upp till vps. --klar men fick en flekod efter 45 st typ, någon bugg ? utrymmebrist ? 
 
 8.
 fixa requirments.txt så att jag får med alla beroenden . --kanske klar nej
@@ -76,19 +81,21 @@ behöver logik för att få ett ämne på mejlet så inte det är tomt varje gå
 
 
 11
-sch api script!
-bara rensa db  och få den snygg !. 
-scb api script 
-antal annställda, antal arbetsställen, inte komun men region västra götaland 
-bolagsverket ? 
-bolagsform ab osvstatus, aktivit, avregistrerat osv, regdatum.
+scb script blir 2 st 
+ett för nya bolag --kolla om det ska vara csv script från bolagsverket ksk
+ett för hämta alla värden --typ klar
+
 logik för att hämta ny reggade bolag (hämtas månadsvis/kvartalsvis via SCB, men Bolagsverket kan ge bättre datum per bolag)
 https://bolagsverket.se/apierochoppnadata/hamtaforetagsinformation/nedladdningsbarafiler.2517.html?utm_source=chatgpt.com
 här ges det csv-fil på nya bolag varje månad, ladda ner, skicka in i db , varje månad , manuellt. 
 
-  nytt script sortera upp bättre så jag har rätt antal cites.  stad måste bli bättre. kansek dropp city och köra komun på alla ? lättast ? är man i göteborgskomun är man i göteborg osv. 
+12. 
+idb migrerign, droppa city och använd dig av komun istället, postort för att få mer exakt i närheten
+nytt script sortera upp bättre så jag har rätt antal cites.  stad måste bli bättre. kansek dropp city och köra komun på alla ? lättast ? är man i göteborgskomun är man i göteborg osv. 
 offentlig vs privat sektor
 
+13. 
+skapa ett script där man kan filtrera på km från leverantören. bonus, didup kankse vill ha det
 12.
 göra github privat 
 
@@ -104,6 +111,11 @@ gå igenom varje script, skicka in till ai, kolla efter fle, men var noga med at
 
 17.
 sätt upp mallar på vad du vill ha från leverantör / customer 
+
+18.
+gör get data till eget repo, på vps, mail-generator är i ett eget git, hitta en bra db path lösning. 
+19. 
+bygg orchestartor för data get, outreah i framtiden elelr kansek nu ? 
 18.
 implementera smtp innan test
 

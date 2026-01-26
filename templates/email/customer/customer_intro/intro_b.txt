@@ -1,0 +1,22 @@
+CUST_Intro_Standard_Säljig
+Karaktär: Mer säljig, framåtlutad, men fortfarande seriös. MANUELL MITT fylls i per leverantör.
+
+Hej ({{ company_name }}),
+
+Jag heter Marcus och driver {{ your_company }}.
+
+Vi hjälper företag att snabbt komma i kontakt med leverantörer som redan är redo
+att hjälpa deras verksamhet framåt.
+
+{{ manual_mid_text }}
+
+Upplägget är enkelt:
+- Ni slipper lägga tid på att leta och jämföra
+- Ni blir kontaktade av rätt leverantör
+- Det är helt kostnadsfritt att ta emot förslag
+
+Om detta känns intressant, svara gärna på mejlet så förklarar jag nästa steg.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}

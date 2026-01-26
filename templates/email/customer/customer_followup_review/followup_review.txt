@@ -1,0 +1,14 @@
+CUST_REVIEW_FU1
+Karaktär: Kort, artig uppföljning på review. Ingen press. Inga frågetecken.
+
+Hej ({{ company_name }}),
+
+Ville bara följa upp mitt tidigare mejl och höra om du haft möjlighet att dela någon återkoppling.
+
+All feedback, både positiv och konstruktiv, är värdefull för oss i vårt arbete med att förbättra tjänsten.
+
+Om det inte är aktuellt just nu är det självklart helt okej, jag ville bara stämma av.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}

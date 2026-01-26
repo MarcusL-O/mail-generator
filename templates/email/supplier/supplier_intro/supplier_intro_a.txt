@@ -1,0 +1,26 @@
+SUP_Intro_AllIn_Short
+Karaktär: Rak, kort, allt på bordet.
+
+Hej ({{ company_name }}),
+
+Jag heter Marcus och driver {{ your_company }}.
+
+Vi hjälper leverantörer att få in nya kundförfrågningar från företag som redan aktivt
+letar efter den här typen av tjänst.
+
+Upplägget är enkelt och helt riskfritt:
+- Ingen startkostnad
+- Ingen månadsavgift
+- Ni betalar endast om det blir ett bokat möte och om det leder till affär
+
+Det kostar alltså ingenting att tacka ja.
+
+Om detta är intressant är allt jag behöver en kontaktperson, mejl eller telefon,
+som kan ta emot potentiella förfrågningar – resten sköter vi.
+
+Låter det relevant, svara gärna på mejlet så tar vi detaljerna därifrån.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}
+{{ your_contact_info }}

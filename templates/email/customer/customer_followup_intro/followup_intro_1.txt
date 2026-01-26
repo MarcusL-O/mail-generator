@@ -1,0 +1,13 @@
+CUST_FU1_Reminder
+Karaktär: Kort, artig påminnelse. Ingen säljpress.
+
+Hej ({{ company_name }}),
+
+Ville bara följa upp mitt tidigare mejl och höra om detta är något som känns relevant för er,
+eller om det är bättre att jag återkommer vid ett annat tillfälle.
+
+Oavsett vilket, tack för att du tog dig tid att läsa.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}

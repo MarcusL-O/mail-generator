@@ -1,0 +1,25 @@
+SUP_Intro_Sales_Punchy
+Karaktär: Rak, säljig, punchy.
+
+Hej ({{ company_name }}),
+
+Jag hör av mig eftersom vi just nu hjälper företag som aktivt vill boka möte
+att komma i kontakt med rätt leverantör.
+
+Kort om upplägget:
+- Vi bokar möten med företag som redan vill köpa
+- Inga abonnemang, inga bindningar
+- Ni betalar per bokat möte
+- Extra ersättning om mötet leder till affär
+
+Det betyder att ni inte betalar för synlighet, annonser eller leads,
+utan för faktiska möten med köpsugna företag.
+
+Vi letar just nu efter en leverantör i {{ city }},
+och ({{ company_name }}) stack ut.
+
+Om detta är intressant, svara på mejlet så går vi igenom detaljerna.
+
+Vänliga hälsningar
+Marcus
+{{ your_company }}

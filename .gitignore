@@ -27,7 +27,6 @@ data
 # Ignore large data formats explicitly (extra safety)
 *.csv
 *.tsv
-*.txt
 *.zip
 *.ndjson
 *.json
@@ -77,3 +76,8 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+secrets/
+.env
+*.pfx
+

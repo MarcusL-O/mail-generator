@@ -1,0 +1,2 @@
+pip install lxml
+Installera: pip install requests-pkcs12
