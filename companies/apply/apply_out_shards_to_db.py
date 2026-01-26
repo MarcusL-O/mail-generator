@@ -14,24 +14,24 @@ from pathlib import Path
 # KONFIG
 # =========================
 DB_PATH = Path("data/db/companies.db.sqlite")
-OUT_DIR = Path("data/out")
+OUT_DIR = Path("data/out/shards")
 
 WEBSITES_PATTERNS = [
-    "data/out/websites_guess_shard*.ndjson",
-    "data/out/websites_guess.ndjson",
+    "data/out/shards/websites_guess_shard*.ndjson",
+    "data/out/shards/websites_guess.ndjson",
 ]
 EMAILS_PATTERNS = [
-    "data/out/emails_found_shard*.ndjson",
-    "data/out/emails_found.ndjson",
+    "data/out/shards/emails_found_shard*.ndjson",
+    "data/out/shards/emails_found.ndjson",
 ]
 TECH_PATTERNS = [
-    "data/out/tech_footprint_shard*.ndjson",
+    "data/out/shards/tech_footprint_shard*.ndjson",
 ]
 SITE_REVIEW_PATTERNS = [
-    "data/out/site_review_shard*.ndjson",
+    "data/out/shards/site_review_shard*.ndjson",
 ]
 HIRING_PATTERNS = [
-    "data/out/hiring_review_shard*.ndjson",
+    "data/out/shards/hiring_review_shard*.ndjson",
 ]
 
 COMMIT_EVERY = 2000
