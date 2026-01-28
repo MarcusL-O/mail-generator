@@ -4,6 +4,11 @@
 # - INSERT: nya orgnr (companies)
 # - UPDATE: befintliga rader om de saknar värden (fill-if-null)
 # - Markerar inactive om avregistreringsdatum finns
+#
+# ÄNDRING: bv_active sätts alltid utifrån senaste filen:
+# - deregdate finns => 0
+# - annars => 1
+# (tidigare kunde 0 “låsa fast” för alltid)
 
 from __future__ import annotations
 
@@ -257,7 +262,7 @@ def main() -> None:
 
                       {BV_ACTIVE} = CASE
                           WHEN ? IS NOT NULL AND ? != '' THEN 0
-                          ELSE COALESCE({BV_ACTIVE}, 1)
+                          ELSE 1
                       END,
 
                       {COL_UPDATED_AT} = datetime('now')
