@@ -19,7 +19,7 @@ def main() -> None:
     cur = con.cursor()
 
     # =========================
-    # companies
+    # companies (REN MASTER)
     # =========================
     cur.execute("""
     CREATE TABLE companies (
@@ -33,7 +33,6 @@ def main() -> None:
         employees_class TEXT,
         workplaces_count INTEGER,
         employees_trend TEXT,
-        employees_trend_at TEXT,
 
         sni_codes TEXT,
         sni_text TEXT,
@@ -53,16 +52,18 @@ def main() -> None:
         it_support_signal TEXT,
         it_support_confidence TEXT,
 
+        -- Juridik / grund
         registration_date TEXT,
         legal_form TEXT,
         company_status TEXT,
-        sector TEXT,
-        private_public TEXT,
+        sector TEXT,                -- private | public
 
+        -- Klassificering
         line_of_work TEXT,
         line_of_work_conf REAL,
         segment_groups TEXT,
 
+        -- Ekonomi (senaste snapshot)
         financial_score_total REAL,
         financial_latest_year_end TEXT,
         financial_net_revenue_latest INTEGER,
@@ -103,7 +104,7 @@ def main() -> None:
     """)
 
     # =========================
-    # financials
+    # financials (rå per år)
     # =========================
     cur.execute("""
     CREATE TABLE company_financials (
@@ -130,7 +131,7 @@ def main() -> None:
     """)
 
     # =========================
-    # financial scores (per år)
+    # financial scores (modell-output)
     # =========================
     cur.execute("""
     CREATE TABLE company_financial_scores (
