@@ -5,11 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, List
 
-# =========================
-# KONFIG (samma stil som db_overview.py)
-# =========================
 DB_PATH = Path("data/db/companies.db.sqlite")
-# =========================
 
 
 def resolve_db_path() -> Path:

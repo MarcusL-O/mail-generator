@@ -1,199 +1,151 @@
-# retunerar lista med allt i db 
+# companies/control/db_overview.py
+# Kommentar (svenska):
+# - Översikt för nya schema (companies + checks + ekonomi)
+# - Inga antaganden om gamla fält (ingen private_public, ingen employees_trend_at)
+
 from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Dict, List, Tuple
 
-# =========================
-# KONFIG (samma stil som shards/apply)
-# =========================
 DB_PATH = Path("data/db/companies.db.sqlite")
-# =========================
 
 
-def utc_now_str() -> str:
+def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def print_section(title: str) -> None:
-    print("\n" + title)
-    print("-" * len(title))
+def one(cur: sqlite3.Cursor, sql: str, params: Tuple[Any, ...] = ()) -> Any:
+    r = cur.execute(sql, params).fetchone()
+    return None if r is None else r[0]
 
 
-def print_kv(key: str, value: Any) -> None:
-    print(f"{key:<24} {value}")
-
-
-def one(cur: sqlite3.Cursor, sql: str, params: Iterable[Any] = ()) -> Any:
-    row = cur.execute(sql, tuple(params)).fetchone()
-    return None if row is None else row[0]
-
-
-def nonempty_sql(col: str) -> str:
-    return f"TRIM(COALESCE({col},'')) != ''"
-
-
-def table_exists(cur: sqlite3.Cursor, table: str) -> bool:
-    return one(cur, "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)) is not None
-
-
-def get_columns(cur: sqlite3.Cursor, table: str) -> set[str]:
-    cols: set[str] = set()
-    for row in cur.execute(f"PRAGMA table_info({table})").fetchall():
-        cols.add(row[1])
-    return cols
-
-
-def count_rows(cur: sqlite3.Cursor, table: str) -> int:
-    return int(one(cur, f"SELECT COUNT(*) FROM {table}") or 0)
-
-
-def pct(part: int, total: int) -> str:
+def pct(n: int, total: int) -> str:
     if total <= 0:
         return "0.0%"
-    return f"{(part * 100.0 / total):.1f}%"
+    return f"{(n * 100.0 / total):.1f}%"
 
 
-def print_table_counts(cur: sqlite3.Cursor) -> None:
-    print_section("TABLES")
-    rows = cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-    ).fetchall()
-    for (name,) in rows:
-        if name == "leads":
-            continue  #du vill inte se leads här
-        print_kv(name, f"{count_rows(cur, name):,} rows")
+def filled_count(cur: sqlite3.Cursor, table: str, col: str) -> int:
+    sql = f"SELECT COUNT(*) FROM {table} WHERE TRIM(COALESCE({col},'')) != ''"
+    return int(one(cur, sql) or 0)
 
 
-def print_companies_core(cur: sqlite3.Cursor, total: int, cols: set[str]) -> None:
-    print_section("COMPANIES – CORE COVERAGE")
-
-    def nonempty_count(col: str) -> int:
-        return int(one(cur, f"SELECT COUNT(*) FROM companies WHERE {nonempty_sql(col)}") or 0)
-
-    for c in ["website", "emails", "employees", "sni_codes", "city"]:
-        if c not in cols:
-            continue
-        n = nonempty_count(c)
-        print_kv(c, f"{n:,} ({pct(n, total)})")
+def nonnull_count(cur: sqlite3.Cursor, table: str, col: str) -> int:
+    sql = f"SELECT COUNT(*) FROM {table} WHERE {col} IS NOT NULL"
+    return int(one(cur, sql) or 0)
 
 
-def print_status_counts(cur: sqlite3.Cursor, cols: set[str], col: str) -> None:
-    if col not in cols:
-        return
-    print_section(col)
+def print_dist(cur: sqlite3.Cursor, table: str, col: str, title: str, limit: int = 10) -> None:
+    print(title)
     rows = cur.execute(
         f"""
-        SELECT COALESCE(NULLIF(TRIM(CAST({col} AS TEXT)), ''), '(empty)') AS v, COUNT(*) AS n
-        FROM companies
+        SELECT COALESCE(NULLIF(TRIM({col}),''), '(empty)') AS v, COUNT(*) AS n
+        FROM {table}
         GROUP BY v
         ORDER BY n DESC
-        LIMIT 30
-        """
+        LIMIT ?
+        """,
+        (limit,),
     ).fetchall()
-    for r in rows:
-        print_kv(f"- {r['v']}", f"{int(r['n']):,}")
-
-
-def print_tech_signals(cur: sqlite3.Cursor, cols: set[str]) -> None:
-    print_section("TECH / IT SIGNALS")
-    for c in [
-        "microsoft_status",
-        "microsoft_strength",
-        "microsoft_confidence",
-        "it_support_signal",
-        "it_support_confidence",
-    ]:
-        print_status_counts(cur, cols, c)
-
-
-def print_freshness(cur: sqlite3.Cursor, cols: set[str], total: int) -> None:
-    if "tech_checked_at" not in cols:
-        return
-
-    print_section("DATA FRESHNESS (tech_checked_at)")
-    last_24h = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at >= datetime('now','-1 day')") or 0)
-    last_7d = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at >= datetime('now','-7 day')") or 0)
-    last_30d = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at >= datetime('now','-30 day')") or 0)
-    never = int(one(cur, "SELECT COUNT(*) FROM companies WHERE tech_checked_at IS NULL OR TRIM(tech_checked_at)=''") or 0)
-
-    print_kv("- last 24h", f"{last_24h:,} ({pct(last_24h, total)})")
-    print_kv("- last 7 days", f"{last_7d:,} ({pct(last_7d, total)})")
-    print_kv("- last 30 days", f"{last_30d:,} ({pct(last_30d, total)})")
-    print_kv("- never", f"{never:,} ({pct(never, total)})")
-
-    newest = one(cur, "SELECT MAX(tech_checked_at) FROM companies")
-    print_kv("newest tech_checked_at", newest or "(none)")
-
-
-def print_top_cities(cur: sqlite3.Cursor, cols: set[str]) -> None:
-    if "city" not in cols:
-        return
-    print_section("TOP CITIES (companies.city)")
-    rows = cur.execute(
-        """
-        SELECT TRIM(city) AS city, COUNT(*) AS n
-        FROM companies
-        WHERE TRIM(COALESCE(city,'')) != ''
-        GROUP BY TRIM(city)
-        ORDER BY n DESC
-        LIMIT 10
-        """
-    ).fetchall()
-    for i, r in enumerate(rows, start=1):
-        print_kv(f"{i}. {r['city']}", f"{int(r['n']):,}")
+    for v, n in rows:
+        print(f"- {v:<22} {int(n):,}")
+    print()
 
 
 def main() -> None:
     if not DB_PATH.exists():
         raise FileNotFoundError(f"DB saknas: {DB_PATH}")
 
-    con = sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(DB_PATH.as_posix())
     con.row_factory = sqlite3.Row
+    cur = con.cursor()
 
-    try:
-        cur = con.cursor()
+    tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
 
-        print("DATABASE OVERVIEW")
-        print_kv("Database", str(DB_PATH))
-        print_kv("Generated", utc_now_str())
+    total_companies = int(one(cur, "SELECT COUNT(*) FROM companies") or 0)
+    total_checks = int(one(cur, "SELECT COUNT(*) FROM company_checks") or 0) if "company_checks" in tables else 0
+    total_hist = int(one(cur, "SELECT COUNT(*) FROM company_employee_class_history") or 0) if "company_employee_class_history" in tables else 0
+    total_fin = int(one(cur, "SELECT COUNT(*) FROM company_financials") or 0) if "company_financials" in tables else 0
+    total_scores = int(one(cur, "SELECT COUNT(*) FROM company_financial_scores") or 0) if "company_financial_scores" in tables else 0
 
-        print_table_counts(cur)
+    print("DATABASE OVERVIEW")
+    print(f"Database                 {DB_PATH}")
+    print(f"Generated                {utc_now_iso()}\n")
 
-        if not table_exists(cur, "companies"):
-            print("\n(ingen tabell: companies)")
-            return
+    print("TABLES")
+    print("------")
+    for t in ["companies", "company_checks", "company_employee_class_history", "company_financial_scores", "company_financials"]:
+        if t in tables:
+            n = int(one(cur, f"SELECT COUNT(*) FROM {t}") or 0)
+            print(f"{t:<24} {n:,} rows")
+    print()
 
-        cols = get_columns(cur, "companies")
-        total = count_rows(cur, "companies")
+    print("COMPANIES")
+    print("---------")
+    print(f"total companies          {total_companies:,}\n")
 
-        print_section("COMPANIES")
-        print_kv("total companies", f"{total:,}")
+    print("COMPANIES – CORE COVERAGE")
+    print("-------------------------")
+    for col in ["website", "emails", "sni_codes"]:
+        n = filled_count(cur, "companies", col)
+        print(f"{col:<23} {n:,} ({pct(n, total_companies)})")
+    print()
 
-        print_companies_core(cur, total, cols)
+    print("COMPANIES – GEO/LEGAL COVERAGE")
+    print("------------------------------")
+    for col in ["kommun", "region", "postort", "registration_date", "legal_form", "company_status", "sector"]:
+        n = filled_count(cur, "companies", col)
+        print(f"{col:<23} {n:,} ({pct(n, total_companies)})")
+    print()
 
-        for c in ["website_status", "email_status", "hiring_status"]:
-            print_status_counts(cur, cols, c)
+    print("COMPANIES – EMPLOYEES COVERAGE")
+    print("------------------------------")
+    for col in ["employees_class", "workplaces_count", "employees_trend"]:
+        if col == "workplaces_count":
+            n = nonnull_count(cur, "companies", col)
+        else:
+            n = filled_count(cur, "companies", col)
+        print(f"{col:<23} {n:,} ({pct(n, total_companies)})")
+    print()
 
-        print_tech_signals(cur, cols)
-        print_freshness(cur, cols, total)
-        print_top_cities(cur, cols)
+    print("HIRING")
+    print("------")
+    print_dist(cur, "companies", "hiring_status", "hiring_status", limit=10)
 
-        print("\nSUMMARY")
-        if "website" in cols:
-            w = int(one(cur, f"SELECT COUNT(*) FROM companies WHERE {nonempty_sql('website')}") or 0)
-            print_kv("website coverage", f"{pct(w, total)}")
-        if "emails" in cols:
-            e = int(one(cur, f"SELECT COUNT(*) FROM companies WHERE {nonempty_sql('emails')}") or 0)
-            print_kv("emails coverage", f"{pct(e, total)}")
-        if "microsoft_status" in cols:
-            ms_yes = int(one(cur, "SELECT COUNT(*) FROM companies WHERE microsoft_status='yes'") or 0)
-            print_kv("microsoft yes", f"{ms_yes:,} ({pct(ms_yes, total)})")
+    print("TECH / IT SIGNALS")
+    print("-----------------")
+    for col in ["microsoft_status", "microsoft_strength", "microsoft_confidence", "it_support_signal", "it_support_confidence"]:
+        n = filled_count(cur, "companies", col)
+        print(f"{col:<23} {n:,} ({pct(n, total_companies)})")
+    print()
 
-    finally:
-        con.close()
+    print("ECONOMY SNAPSHOT (companies)")
+    print("----------------------------")
+    for col in ["financial_score_total", "financial_latest_year_end", "financial_net_revenue_latest", "financial_revenue_trend_pct", "financial_revenue_trend"]:
+        if col in ("financial_score_total", "financial_net_revenue_latest"):
+            n = nonnull_count(cur, "companies", col)
+        else:
+            n = filled_count(cur, "companies", col)
+        print(f"{col:<23} {n:,} ({pct(n, total_companies)})")
+    print()
+
+    print("SUMMARY")
+    print("-------")
+    website_cov = filled_count(cur, "companies", "website")
+    emails_cov = filled_count(cur, "companies", "emails")
+    sni_cov = filled_count(cur, "companies", "sni_codes")
+    print(f"website coverage         {pct(website_cov, total_companies)}")
+    print(f"emails coverage          {pct(emails_cov, total_companies)}")
+    print(f"sni_codes coverage       {pct(sni_cov, total_companies)}")
+    print(f"company_checks rows      {total_checks:,}")
+    print(f"employee_history rows    {total_hist:,}")
+    print(f"financials rows          {total_fin:,}")
+    print(f"financial_scores rows    {total_scores:,}")
+
+    con.close()
 
 
 if __name__ == "__main__":
